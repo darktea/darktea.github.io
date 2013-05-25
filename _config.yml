@@ -24,7 +24,7 @@ meta:
     author:
         name: Darktea
         email: tiantianding@gmail.com
-        disqus: Darktea              # Disqus缩略标识
+        disqus: darktea              # Disqus缩略标识
         gcse: 000346898720731947188:13h55x32l0y     # Google自定义搜索标识ID
         github: darktea                 # GitHub账号
         gravatar: 000000000  # Gravatar头像标识
