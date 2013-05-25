@@ -28,3 +28,5 @@ category: notes
 1. 然后把修改用 git push 到 Github 上面去就行了
 
 最后, 重新刷新一下 Blog 看看修改的效果
+
+{% include references.md %}
