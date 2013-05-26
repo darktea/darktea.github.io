@@ -207,8 +207,37 @@ P2c: 如果某个 proposer 要提出一个提案 {v, n}，那么必须满足下�
 
 而 P1a 和 P1 不矛盾. 所以只要同时满足 P1a 和 P2c 就可以达到 Safety.
 
+
+# 五, Paxos 算法
+
+上一节已经说过了, 同时满足 P1a 和 P2c 就可以达到 Safety 满足一致性. 不过在这个基础上还可以做一个优化:
+
+* 如果某个 acceptor 先对版本号为 5 的 prepare 请求返回过承诺, 那么当它之后收到一个版本号为 4 的 prepare 请求时, 这个 acceptor 可以忽略这个版本号为 4 的 prepare 请求
+* 因为, 就算对 4号 prepare 请求返回响应, 之后也不会批准 4号提案的 accept 请求
+
+acceptor 需要持久化两种信息:
+
+* 它已经批准过的最大版本号的提案 (根据 P2c)
+* 它已经承诺过的 prepare 请求中的最大版本号的请求的版本号 (根据上面的优化)
+
+也就是说, 当 acceptor 重启恢复以后, 能重新拿到这两个信息. 同时, proposer 不需要持久化任何信息, 可以随意重启 (只需要每次提交提案时, 都用一个全局唯一的版本号就行了)
+
+完整的算法如下:
+
+* Phase 1.
+ * proposer 选择一个提案版本号为 n, 然后向 acceptor 的某个多数派集合的成员发送版本号为 n 的 prepare 请求
+ * 如果一个 acceptor 收到一个版本号为 n 的 prepare 请求, 且 n 大于它已经承诺过的所有 prepare 请求的版本号, 那么它就会承诺不会再批准任何版本号小于 n 的提案, 同时将它已经批准过的最大编号的提案 (如果存在的话) 作为响应返回
+* Phase 2.
+ * 如果 proposer 收到来自半数以上的 acceptor 对于它的 prepare 请求 (版本号为 n) 的响应, 那么它就会发送一个针对版本号为 n, value 值为 v 的提案的 accept 请求给 acceptor, 在这里, v 是收到的响应中版本号最大的提案的值, 如果所有响应中都不包含提案, 那么它就是任意值。
+ * 如果 acceptor  收到一个针对版本号 n 的提案的 accept 请求, 只要它还未对版本号大于 n 的 prepare 请求作出承诺, 它就可以批准这个提案
+
+
 {% include references.md %}
 
 * https://github.com/dsdoc/dsdoc/blob/master/paxosmadesimple/index.rst
 * http://hi.baidu.com/tkdsheep/item/bebe140729acd60b6c9048f7
+
+* http://blog.csdn.net/sparkliang/article/details/5740882
+* http://blog.csdn.net/colorant/article/details/8431934
 * http://www.vpsee.com/2009/09/paxos-algorithm/
+* http://stblog.baidu-tech.com/?p=1196
