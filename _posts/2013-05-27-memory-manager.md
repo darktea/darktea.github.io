@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Linux Page Cache and Buffer Cache
+title: Linux 内存管理
 category: notes
 ---
 
