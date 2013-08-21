@@ -75,7 +75,7 @@ Linux Kernel 用  struct vm_area_struct 来描述 Memory Area.  每个 Memory Ar
 
 Linux 按页管理内存, 当用户进程要存取某个 Page, 但这个 Page 还没有存在在物理内存中, Linux 触发一次 Page Fault, 把这个 Page 和 物理 Page Frame 对应起来.
 
-Linux Kernel 利用 Page Table 来做虚拟地址到物理内存的地址 (每个进程都有自己的 Page Table). 
+Linux Kernel 利用 Page Table 来做虚拟地址到物理内存的地址映射 (每个进程都有自己的 Page Table). 
 
 Linux Kernel 使用 4 级页表: PGD->PUD -> PMD->PTE; 操作系统只要先做好设置, 一般来说, 硬件 (CPU) 会自动做虚拟地址到物理地址的映射 (MMU);
 
