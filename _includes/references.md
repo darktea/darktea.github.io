@@ -1,4 +1,4 @@
-
+[指尖]: http://hueidou.github.com/
 [Disqus]: http://disqus.com/
 [elf+js]: http://elfjs.com/
 [ER]: http://www.errorrik.com/er/
@@ -13,3 +13,5 @@
 [jslib-builder]: http://github.com/elfjs/jslib-builder/
 [Markdown]: http://daringfireball.net/projects/markdown/
 [WordPress]: http://wordpress.org/
+[SimpleGray]: https://github.com/mytharcher/SimpleGray
+[Markdown-Syntax-CN]: http://gitcafe.com/riku/Markdown-Syntax-CN/blob/master/syntax.md
