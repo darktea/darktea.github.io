@@ -67,7 +67,7 @@ echo $foo       # prints "a a a"
  
 ```
 
-* $1 最近运行的背景进程的进程 id
+* $! 最近运行的背景进程的进程 id
 
 ```shell
 # sort two files in parallel:
@@ -81,7 +81,7 @@ echo $foo       # prints "a a a"
  
 ```
 
-# 3. 字符串处理
+# 4. 字符串处理
 
 * 替换
 
