@@ -106,6 +106,25 @@ echo $foo       # prints "a a a"
  echo ${foo/balls}       # prints I like meat.
 ```
 
+# 5. 数组长度
+
+```shell
+ARRAY=(abcdd b c)
+echo ${#ARRAY}          # prints 5 错误
+
+echo ${#ARRAY[@]}     # prints 3 正确
+```
+
+# 6. 引号
+
+```shell
+world=Earth
+foo='Hello, $world!'
+bar="Hello, $world!"
+echo $foo            # 单引号, prints Hello, $world!
+echo $bar            # 双引号, prints Hello, Earth!
+```
+
 # References:
 
 * [Shell programming with bash: by example, by counter-example](http://matt.might.net/articles/bash-by-example/)

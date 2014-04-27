@@ -17,9 +17,9 @@ Kernel 用一个数据结构 struct page 来表示系统中的一个 Page Frame 
 {% highlight c %}
 struct page { 
     unsigned long            flags;
-    atomic_t                     _count; 
-    struct address_space  *mapping; 
-    struct list_head           lru; 
+    atomic_t                 _count; 
+    struct address_space     *mapping; 
+    struct list_head         lru; 
 };
 {% endhighlight %}
 
