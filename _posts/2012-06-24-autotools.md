@@ -1,3 +1,9 @@
+---
+layout: post
+title: Autotools 使用入门
+category: notes
+---
+
 # Autotools 使用入门
 
 介绍 Autotools 的相关文章网上已经太多了，但这些文章要么是把一大堆工具列举出来，要么就是来一个 step by step 的例子。
