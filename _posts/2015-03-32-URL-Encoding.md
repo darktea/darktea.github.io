@@ -23,12 +23,11 @@ category: notes
 
 **本文的组织方式：**
 
-* 背景知识
- * URL 的语法和编码
- * 字符集及字符编码
-* 解决方案
+* URL 的语法和编码
+* 字符集及字符编码
+* 问题解决方案
 
-# 二, 背景知识
+# 二, URL 的语法和编码
 
 在讲 URL 的 ecoding 之前，需要先了解 URL 的语法。
 
@@ -64,13 +63,13 @@ https://bob:bobby@www.lunatech.com:8080/file;p=1?q=2#third
 * 对 Path 部分不需要转义：
 
 ```
-  ":@-._~!$&'()*+,;="
+:@-._~!$&'()*+,;=
 ```
 
 * 对 Fragment 部分不需要转义：
 
 ```
-"/?:@-._~!$&'()*+,;="
+/?:@-._~!$&'()*+,;=
 ```
 
 
@@ -121,6 +120,66 @@ blue+light blue
 * %C1%B9%D0%AC%C5%AE
 * %E5%87%89%E9%9E%8B%E5%A5%B3
 
-# References:
+# 三, 字符集及字符集编码
+
+## 1. 字符集
+
+* ASCII： 7bits 表示一个字符，共128字符
+* ASCII的增强：
+ * 8bits表示一个字符，共256字符。例如： ISO­8859­1 （西欧字符）
+ * 2Bytes表示一个字符，GBK。（其特点后面详细讲）
+* Unicode字符集：对全世界的每个字符，规定一个唯一的数字（其范围目前是U+0000~U+10FFFF，大概100万，32bits可以搞定 ）来代表。例如：\u5973 女
+* 其他很多扩展字符集。。。
+
+## 2. 字符集编码
+
+字符集编码：计算机里面怎么存储、传输Unicode字符。例如：UTF-8，UTF-16，UTF-32 。。。
+
+## 3. GBK
+
+既是一种字符集又是一种编码。
+
+* GB2312（双字节）：小于127的字符兼容ASCII，但两个大于127的字符连在一起时，就表示一个汉字，前面的一个字节（高字节）从0xA1到 0xF7，后面一个字节（低字节）从0xA1到0xFE。一共 7000 多个字符 （其中6千多个简体字）
+* GBK （双字节）：微软对GB2312 进行扩展，加入繁体字，日语及朝鲜语汉字等。2万多个汉字
+* GB18030 （四字节）：是中华人民共和国现时最新的内码字集，与GB2312完全兼容，与GBK基本兼容，支持GB 13000及Unicode的全部统一汉字
+
+## 4. Unicode编码
+
+Unicode 字符集目前的范围是 U+0000~U+10FFFF。对 Unicode 字符集有多种编码。
+
+* UTF-32：直接用4字节存储 （有大小端问题）
+* UTF-16：最早的时候，Unicode的范围没有这么大，可以直接用2字节搞定；现在2字节不够，UTF-16的编码做了更新，2字节或者4字节。 （同样有大小端问题）
+* UTF-8：变长，最多4字节。没有大小端问题。可以检测到每个字符的边界。
+
+## 5. Java 中的字符集编码
+
+String使用 UTF-16（2字节或者4字节）：
+
+```
+String chinese="ab中文”
+String b= new String(bs,“GBK"); // bs is a byte array
+```
+
+Refer:
+
+* http://www.zhihu.com/question/27562173
+* http://lukejin.iteye.com/blog/586088
+
+# 四, 问题解决方案
+
+* %E5%87%89%E9%9E%8B%E5%A5%B3 => 一个 java byte 数组
+* Java byte 数组 => Java 字符串类型, 分别用 UTF-8 和 GBK 解码
+
+```java
+String a= new String(bs,“UTF-8");
+String b= new String(bs,“GBK");
+```
+
+* 利用 nio 对 a 和 b 进行检测，判断是否是中文（没有乱码）：
+ * java.nio.charset.Charset.forName("GBK").newEncoder().canEncode(a));
+* 如果都返回 true（看起来都不是乱码）。用正则判断是否是 UTF-8，否则就是 GBK
+ * 例外 case（正则判断是 UTF-8，但实际上还是 GBK）： "鏈條", "瑷媄", "妤媞", "浜叉鼎"
+
+# 五, References:
 
 * [What every web developer must know about URL encoding](http://www.oschina.net/translate/what-every-web-developer-must-know-about-url-encoding)
