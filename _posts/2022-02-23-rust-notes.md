@@ -593,6 +593,8 @@ fn main() {
 * String 上的 slice range 语法是 byte 级别的操作。如果尝试从一个多字节字符的中间位置创建字符串 slice，则程序将会因错误而退出。
 
 ```rust
+#![allow(unused)]
+
 fn main() {
     let s = String::from("hello world");
 
@@ -793,15 +795,40 @@ fn main() {
 
 ### a. Attribute
 
-* 在 Rust 中，Attributes 类似 Java 和注解（annotations），或者 C/C++ 中的 #ifndef 这种给编译器使用的属性
+* 在 Rust 中，Attributes 类似 Java 的注解（annotations），或者 C/C++ 中的 #ifndef 这种给编译器使用的属性
+  * Attributes 都是给编译器使用的
+
+* 注解在 Rust 的各种 items 上
+  * 例如：注解在 module 上，并对整个 module 生效（标注在 module 上：\#[cfg]，#[allow]）
+  * Rust 中 item 的类型具体有：
+    * module
+    * extern crate 声明
+    * use 声明
+    * 函数定义
+    * 类型定义
+    * 结构体定义
+    * 枚举定义
+    * 联合体定义
+    * 常量项
+    * 静态项
+    * trait 定义
+    * 实现
+    * 外部块
+* crate 上：标注在整个 crate 的最前面，需要使用 \#![cfg] （多一个 ! 表示作用在整个 crate 上）
+* Rust 中常用的 Attributes 有 4 大类：
+  * Built-in attributes（内建属性）：下面会有些例子
+  * Macro attributes（宏属性）：略
+  * Derive macro helper attributes（派生宏辅助属性）
+  * Tool attributes（工具属性）：略
 
 一些常用的 Attributes：
 
-* \#[cfg]：用于设置编译选项，具体配置项可参考说明
+* #[allow]：显示的关闭编译 warning。例如：#[allow(non_camel_case_types)]
+* \#[cfg]：用于设置编译选项，具体配置项可参考说明。例如：#[cfg(test)]（用于标注只在测试时生效的代码）
 * \#[test]：测试相关
 * \#[doc]：自动生成代码文档
 * \#[derive]：derive 属性会在使用 derive 语法标记的类型上生成对应 trait 的默认实现的代码。给 2 个例子：
-  * \#[derive(Debug)]：println! 里面可以使用 {:?}
+  * \#[derive(Debug)]：只要给 struct 和 enum 加上这个 derive 属性，就可以在 println! 里面直接使用 {:?} 或者 {:#?}
   * \#[derive(Copy, Clone)]：Copy 和 Clone
 
 ## 12. 异常处理
@@ -823,6 +850,9 @@ fn main() {
 
 * 函数调用除了返回正常结果，也可以抛出异常
 * 异常需要带必要的信息：异常码，异常信息，异常时的上下文信息（调用堆栈，代码行号等）
+  * 尽可能提供模块级别（Module Level）的异常类，而不是全局（Crate Level）的异常类
+  * 相同的底层异常（例如一个 IO 异常）抛出时，最好能区分该异常抛出时的上下文信息
+
 * 便捷的把异常透传到最外层
 * 捕捉到异常后，便捷的根据异常具体的信息，执行不同的代码逻辑
 * 通过日志门面库（类似 Java 的 slf4j）和日志实现库（类似 Java 的 log4j，logback）配合，来灵活的记录日志
@@ -1418,11 +1448,7 @@ impl<K, V> HashMap<K, V> where K: Eq + Hash {
 }
 ```
 
-上面这个例子里面的实现是需要用一个 k 来获取 Map 的 v，但这里的 k 是 String 类型，传入了一个 &K。调用它的一个例子：
-
-```rust
-hashtable.get( & "twenty-two".to_string())
-```
+上面这个例子里面的实现是需要用一个 k 来获取 Map 的 v，但这里的 k 是 String 类型，传入了一个 &K。调用它的一个例子： hashtable.get( & "twenty-two".to_string())
 
 该调用的开销如下：
 
@@ -1468,7 +1494,41 @@ trait From<T>: Sized {
 * 和 AsRef 差不多，Into 也有点像 overload（重载）
 * From 常用来进行值的初始化
 
-## 14. 异步
+## 14. IO 标准库
+
+Rust 的 IO 标准库重点就是 3 个 traits：
+
+* Read：统称 Reader，具体的实现包括：Stdin，File，TcpStream
+* BufRead：就是 buffered Reader，继承了 Read trait；具体的实现包括：BufferReader，Cursor，StdinLock
+* Write：统称 Writer，具体的实现包括：Stdout，Stderr，File。。。
+
+### a. Read
+
+这里只重点介绍一个重点方法：
+
+* reader.read(&mut buffer)：把 byte 数据读到指定的 buffer 中（buffer 空间事先已经分配好了），然后返回实际读到的数据的长度。如果出错的话，就返回 io::Error
+
+### b. BufRead
+
+BufRead 的重点方法：
+
+* reader.read_line(&mut line)：按 line 把数据读入到一个 String 类型中（结果包括行分割符：\n，\r\n）。返回本次读到的 byte 数
+* reader.lines()：返回一个 iterator，然后通过迭代拿到一个 io::Result\<String>；同时 \n 不会被放到读到的 String 中
+
+### c. Write
+
+* 利用 write!() 和 writeln!() 这 2 个宏来使用 Write
+* Write 的重点方法：
+  * write(&buf)：把 byte 数据写出。成功的话，返回写入的大小；失败的话，返回 Error
+  * flush()：把数据 flush 到写入目标
+* Write 本身可以创建对应的 BufWriter。例如：BufWriter::new(writer)；并且 BufWriter 也继承了 Write trait
+  * BufWriter 被 drop 的时候，会自动把被 buffer 的数据写出。但如果出现 Error，不保证能成功，所以有可能需要显示调用 flush
+
+## 15. 线程
+
+（待）
+
+## 16. 异步
 
 ### a. Future
 
@@ -1607,7 +1667,7 @@ fn main() {
 * 先用 task::spawn 启动一段异步代码的运行，返回一个新的 future（async_std::task::JoinHandle 类型）
 * 然后 task::block_on 来等待这个 JoinHandle  类型的 future 运行完成，最后从这个 future 拿到最后的运行结果
 
-## 15. Closure
+## 17. Closure
 
 * closure 就是可以把函数作为参数来使用。可以把 closure 作为参数的一些库方法：
   * Iterator
@@ -1618,15 +1678,17 @@ fn main() {
 一个简单的例子：
 
   ```rust
-let s = "hello";
+fn main() {
+    let s = "hello";
 
 // f 是一个 closure，它自动 borrow 入参 s
-let f = | | {
-    println ! ("{}", s);
-};
+    let f = || {
+        println!("{}", s);
+    };
 
 // f 这个 closure 在 s 之前被 dropped，所以这段代码是 OK 的
-f();
+    f();
+}
   ```
 
 * 但如果不能保证 closure 自己会在该引用指向的值的前面被 dropped，不能通过编译
@@ -1636,34 +1698,38 @@ f();
 一个简单的例子：
 
 ```rust
-let s = "hello";
+fn main() {
+    let s = "hello";
 
 // f 是一个 closure，它 move 值 s，并拿到 s 的 ownership
-let f = move | | {
-    println ! ("{}", s);
-};
+    let f = move || {
+        println!("{}", s);
+    };
 
-f();
+    f();
 
 // 之后，当 f 这个 closure 被 dropped，s 也会被 dropped
 // 如果之后还需要使用这个 s，只能在 move 之前 clone 出一份
+}
 ```
 
 一个进行 clone 之后再使用 closure 的简单例子：
 
 ```rust
-let s = "hello";
-let s2 = s.clone();
+fn main() {
+    let s = "hello";
+    let s2 = s.clone();
 
 // move 的时候，用 s2
-let f = move | | {
-println ! ("{}", s2);
-};
+    let f = move || {
+        println!("{}", s2);
+    };
 
-f();
+    f();
 
 // 之后，当 f 这个 closure 被 dropped，s2 会被 dropped
 // 而 s 还可以继续被使用
+}
 ```
 
 ----
@@ -1742,7 +1808,7 @@ fn start_sorting_thread(mut cities: Vec<City>, stat: Statistic)
 
 * 【回顾一下】：borrow 和 move 的本质区别在于 ownership 是否改变
 
-## 16. Iterator
+## 18. Iterator
 
 ### a. 概念
 
@@ -1876,7 +1942,7 @@ fn main() {
 
 参考具体文档熟悉更多的 Iterator Adaptor。
 
-## 17. 宏
+## 19. 宏
 
 Rust 中的宏分以下几种：
 
@@ -1927,9 +1993,11 @@ fn main() {
 最终，会生成类似以下的代码：
 
 ```rust
-let mut temp_vec = Vec::new();
-temp_vec.push(1);
-temp_vec.push(2);
-temp_vec.push(3);
-temp_vec
+fn main() {
+    let mut temp_vec = Vec::new();
+    temp_vec.push(1);
+    temp_vec.push(2);
+    temp_vec.push(3);
+    temp_vec
+}
 ```
