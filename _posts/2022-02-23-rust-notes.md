@@ -1526,7 +1526,166 @@ BufRead 的重点方法：
 
 ## 15. 线程
 
-（待）
+首先明确一点：线程适合同时消耗多个 CPU 并行计算的场景；而不适合同时等待多个 IO 请求（磁盘或网络）的场景。
+
+给一个最简单的例子：
+
+```rust
+use std::thread;
+
+fn main() {
+    let handle = thread::spawn(move || {
+        // do stuff in a child thread
+    });
+
+    // do stuff in the main thread
+
+    // block until child thread has exited
+    handle.join.upwrap();
+}
+```
+
+一个复杂的例子：
+
+```rust
+use log::{error, info};
+use std::{thread, time::Duration};
+
+fn sleep(seconds: f32) {
+    thread::sleep(Duration::from_secs_f32(seconds));
+}
+
+pub mod dad {
+    use super::{info, sleep};
+
+    pub fn cook_spaghetti() -> bool {
+        info!("Cooking the spaghetti...");
+        sleep(4.0);
+        info!("Spaghetti is ready!");
+        true
+    }
+}
+
+pub mod mom {
+    use super::{info, sleep};
+
+    pub fn cook_sauce_and_set_table() {
+        sleep(1.0);
+        info!("Cooking the sauce...");
+        sleep(2.0);
+        info!("Sauce is ready! Setting the table...");
+        sleep(2.0);
+        info!("Table is set!");
+    }
+}
+
+fn main() {
+    env_logger::init();
+    // dad 在工作子线程进行工作
+    let handle = thread::spawn(|| dad::cook_spaghetti());
+
+    // mom 在主线程进行工作
+    mom::cook_sauce_and_set_table();
+
+    // 主线程和工作子线程的工作都完成后，整体完成
+    if handle.join().unwrap_or(false) {
+        info!("Spaghetti time! Yum!")
+    } else {
+        error!("Dad messed up the spaghetti. Order pizza instead?");
+    }
+}
+```
+
+### a. channel
+
+Rust 线程间的通讯需要使用 channel。注意：
+
+* 不推荐使用 std::sync::mpsc，已经过期了
+* 推荐使用 **crossbeam::channel**
+
+> A channel is a one-way conduit for sending values from one thread to another（Rust 保证 channel 线程安全）
+
+channel 又分为有界队列和无界队列 2 种：
+
+* channel::bounded(8)：队列长度为 8；如果队列长度大于 8，生产者（sender）会被阻塞；直到消费者（receiver）消费后才能解开
+* channel::unbounded()：无界队列；不会阻塞生成者，但发生突发负载时，系统可能爆
+* 同一个 channel 可以有多个生产者和多个消费者
+
+一个完整的例子：
+
+```rust
+use crossbeam::channel::{self, Receiver, Sender};
+use std::{thread, time::Duration};
+
+#[derive(Debug)]
+enum Lunch {
+    Soup,
+    Salad,
+    Sandwich,
+    HotDog,
+}
+
+// 不断接受 orders 队列过来的任务，然后对不同类型的食物做一个对应的处理，最后处理好的食物送给 lunches 队列
+fn cafeteria_worker(name: &str, orders: Receiver<&str>, lunches: Sender<Lunch>) {
+    // 一旦 orders 队列所有的 senders 都被关闭，且队列中的数据被消费完，循环结束
+    for order in orders {
+        println!("{} receives an order for {}", name, order);
+        let lunch = match &order {
+            x if x.contains("soup") => Lunch::Soup,
+            x if x.contains("salad") => Lunch::Salad,
+            x if x.contains("sandwich") => Lunch::Sandwich,
+            _ => Lunch::HotDog,
+        };
+        for _ in 0..order.len() {
+            thread::sleep(Duration::from_secs_f32(0.1))
+        }
+        println!("{} sends a {:?}", name, lunch);
+        // lunches 队列被关闭的话，整个循环结束
+        if lunches.send(lunch).is_err() {
+            break;
+        }
+    }
+}
+
+fn main() {
+    // 新建 2 个 channels：orders 和 lunches
+
+    let (orders_tx, orders_rx) = channel::unbounded();
+    // orders 队列有 2 个 receivers
+    let orders_rx2 = orders_rx.clone();
+    let (lunches_tx, lunches_rx) = channel::unbounded();
+    // lunches 队列有 2 个 senders
+    let lunches_tx2 = lunches_tx.clone();
+
+    // 创建 2 个工作子线程负责处理任务：
+    // orders_rx 从 orders 里面接受任务，处理完成后再使用 lunches_tx 发送给  lunches
+    // orders_rx2 从 orders 里面接受任务，处理完成后再使用 lunches_tx2 发送给  lunches  
+    let alice_handle = thread::spawn(|| cafeteria_worker("alice", orders_rx2, lunches_tx2));
+    let zack_handle = thread::spawn(|| cafeteria_worker("zack", orders_rx, lunches_tx));
+
+    for order in vec![
+        "polish dog",
+        "caesar salad",
+        "onion soup",
+        "reuben sandwich",
+    ] {
+        println!("ORDER: {}", order);
+        // orders 只有 1 个 sender（主线程）
+        let _ = orders_tx.send(order);
+    }
+    // 不会清空已经发送到队列的数据，但会关闭这个 sender。之后，一旦队列所有的 senders 都已经关闭，消费者的循环会结束
+    drop(orders_tx);
+
+    // lunches 只有 1 个 receiver（主线程）
+    for lunch in lunches_rx {
+        println!("Order Up! -> {:?}", lunch);
+    }
+
+    // 最后，简单的退出子线程
+    let _ = alice_handle.join();
+    let _ = zack_handle.join();
+}
+```
 
 ## 16. 异步
 
