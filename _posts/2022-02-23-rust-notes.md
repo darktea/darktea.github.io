@@ -4,7 +4,30 @@ title: Rust Notes
 category: notes
 ---
 
-## 1. 「变量」和「类型」
+## 目录
+
+[1. type](#1-type)  
+[2. copy / move / clone](#2-copy--move--clone)  
+[3. ownership](#3-ownership)  
+[4. borrowing](#4-borrowing)  
+[5. references](#5-references)  
+[6. lifetime](#6-lifetime)  
+[7. pointers](#7-pointers)  
+[8. collections](#8-collections)  
+[9. struct](#9-struct)  
+[10. enum](#10-enum)  
+[11. match](#11-match)  
+[12. module](#12-module)  
+[13. error](#13-error)  
+[14. traits](#14-traits)  
+[15. input / output](#15-input--output)  
+[16. threads](#16-threads)  
+[17. async](#17-async)  
+[18. closure](#18-closure)  
+[19. iterator](#19-iterator)  
+[20. macros](#20-macros)  
+
+## 1. type
 
 * 不变：一旦一个变量绑定了一个值，就不能被绑定到其他值上面
 * 可变：该变量可以被绑定到其他值上
@@ -36,7 +59,7 @@ fn main() {
 }
 ```
 
-## 3. 所有权（ownership）
+## 3. ownership
 
 * 所有权（ownership）3 原则
   * Rust 中每一个值都有一个称之为其「所有者」（owner）的变量
@@ -82,11 +105,9 @@ fn calculate_length(s: String) -> usize {
 }
 ```
 
-## 4. borrowing 和 references
+## 4. borrowing
 
-### a. 借用
-
-* **借用** (borrowing)：对函数参数来说，如果不想 ownership 发生变化可以利用引用（reference）。下面给一个简单的例子：
+**借用** (borrowing)：对函数参数来说，如果不想 ownership 发生变化可以利用引用（reference）。下面给一个简单的例子：
 
 ```rust
 fn main() {
@@ -132,7 +153,7 @@ fn change(some_string: &mut String) {
 >
 > (*some_string) = String::from("new string it");
 
-### b. 引用
+## 5. references
 
 * **定义**：The &s1 syntax lets us create a reference that refers to the value of s1 but does not own it
   * **翻译**：s1 是一个值；而 &s1 就是指向这个值的「引用」（但并不 own 这个值）
@@ -170,7 +191,7 @@ fn main() {
     * 值的生命周期必须比指向它的引用的生命周期大（outlives）
     * 如果被引用的变量失效了，这个引用也就失效了
 
-## 5. 生命周期（Lifetime）
+## 6. lifetime
 
 > **【生命周期】原则：一个引用的生命周期不能超过其引用的变量的有效期**
 
@@ -294,7 +315,7 @@ struct S<'a, 'b> {
 }
 ```
 
-## 6. 指针
+## 7. pointers
 
 * Rust 中的指针有 3 种：
   * 【引用】：Rust 中安全的指针。也就是【非所有权指针】，分 &T 和 &mut T 两种。其中 &T 本身是一种 Copy 类型；而 &mut T 并没有实现 Copy Trait（Copy **trait** 的细节请参考其他小节）
@@ -321,7 +342,7 @@ fn main() {
 }
 ```
 
-## 7. collections
+## 8. collections
 
 * collections 存放的是指向 heap 上的数据的指针的集合（和 array/tuple 不一样）：
   * vector：存放同种类型的元素
@@ -612,7 +633,7 @@ fn main() {
 * &str 不能被修改；所以如果要在运行时修改一个字符串，需要使用 String
   * 不过 make_ascii_uppercase 和 make_ascii_lowercase 这 2 个方法是例外，它们会修改 &mut str
 
-## 8. struct
+## 9. struct
 
 定义一个 struct ，然后定义一个返回 struct 的方法
 
@@ -681,7 +702,7 @@ fn main() {
 struct Color(i32, i32, i32);
 ```
 
-## 9. enum
+## 10. enum
 
 Rust 的枚举（enum）可以包含多种不同类型。例如：
 
@@ -731,7 +752,7 @@ enum Option<T> {
 }
 ```
 
-## 10.match
+## 11. match
 
 * match 关键字后跟一个表达式
 * 执行时，根据这个表达式计算出来的值，按顺序进行匹配，进入匹配成功的分支
@@ -778,7 +799,7 @@ fn main() {
 
 ```
 
-## 11. module 和 代码组织
+## 12. module
 
 几个关键词的作用：
 
@@ -831,7 +852,7 @@ fn main() {
   * \#[derive(Debug)]：只要给 struct 和 enum 加上这个 derive 属性，就可以在 println! 里面直接使用 {:?} 或者 {:#?}
   * \#[derive(Copy, Clone)]：Copy 和 Clone
 
-## 12. 异常处理
+## 13. error
 
 * 开发人员作为不同身份时，可以利用不同的方式来应对异常
   * 作为库的开发人员
@@ -1097,7 +1118,7 @@ impl From<sqlx::Error> for SubscribeError {
 use log::*;
 ```
 
-## 13. Traits
+## 14. traits
 
 * 在 Rust 中，Trait 就类似 Java 的 Interface（接口）的作用
 * 使用 trait 时必须先 use 它。但 Clone 和 Iterator 是例外，可以不导入也能用，这是因为 Clone 和 Iterator 在 standard prelude 中
@@ -1494,7 +1515,7 @@ trait From<T>: Sized {
 * 和 AsRef 差不多，Into 也有点像 overload（重载）
 * From 常用来进行值的初始化
 
-## 14. IO 标准库
+## 15. input / output
 
 Rust 的 IO 标准库重点就是 3 个 traits：
 
@@ -1524,7 +1545,7 @@ BufRead 的重点方法：
 * Write 本身可以创建对应的 BufWriter。例如：BufWriter::new(writer)；并且 BufWriter 也继承了 Write trait
   * BufWriter 被 drop 的时候，会自动把被 buffer 的数据写出。但如果出现 Error，不保证能成功，所以有可能需要显示调用 flush
 
-## 15. 线程
+## 16. threads
 
 首先明确一点：线程适合同时消耗多个 CPU 并行计算的场景；而不适合同时等待多个 IO 请求（磁盘或网络）的场景。
 
@@ -1755,7 +1776,7 @@ fn main() {
 }
 ```
 
-## 16. 异步
+## 17. async
 
 先明确几个概念：
 
@@ -1963,7 +1984,7 @@ fn main() {
 
 （待）
 
-## 17. Closure
+## 18. closure
 
 * closure 就是可以把函数作为参数来使用。可以把 closure 作为参数的一些库方法：
   * Iterator
@@ -2104,7 +2125,7 @@ fn start_sorting_thread(mut cities: Vec<City>, stat: Statistic)
 
 * 【回顾一下】：borrow 和 move 的本质区别在于 ownership 是否改变
 
-## 18. Iterator
+## 19. Iterator
 
 ### a. 概念
 
@@ -2238,7 +2259,7 @@ fn main() {
 
 参考具体文档熟悉更多的 Iterator Adaptor。
 
-## 19. 宏
+## 20. macros
 
 Rust 中的宏分以下几种：
 
