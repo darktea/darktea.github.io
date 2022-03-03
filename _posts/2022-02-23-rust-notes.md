@@ -1596,7 +1596,7 @@ fn main() {
 }
 ```
 
-### a. channel
+### a. Channels
 
 Rust 线程间的通讯需要使用 channel。注意：
 
@@ -1687,11 +1687,89 @@ fn main() {
 }
 ```
 
+### b. Arc\<T>
+
+* Arc\<T>：原子引用计数
+  * Arc\<T> 是一种「智能指针」，和 Rc\<T> 功能上类似，不同之处只是因为是**原子计数**，所以能保证**线程安全**
+  * 对一个分配在堆上的 T 值，可以有多个 Arc\<T> 指针指向这个 T 值。只有当指向这个 T 值的所有指针都被销毁后，这个 T 值才也被销毁（引用计数为 0）
+
+一个简单的例子：
+
+```rust
+use std::thread;
+use std::sync::Arc;
+use std::time::Duration;
+
+fn main() {
+    // foo 指向一个值
+    let foo = Arc::new(vec![0]);
+    // bar 也指向这个值（也就是引用计数加一）
+    let bar = Arc::clone(&foo);
+
+    // 启动一个子线程，这个子线程内部，会在 20 毫秒后，发生一次 move，使用这个值，然后引用计数减一
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(20));
+        println!("{:?}", *bar);
+    });
+
+    // 主线程会立即进行 move，使用这个值，然后引用计数减一
+    // 但此时引用计数还没有被减到 0，所以这个值在主线程执行之后不会被销毁
+    println!("{:?}", foo);
+} 
+```
+
+* 默认场景 Arc\<T> 不能是可变的（mut）。如果需要可变，可以配合 Mutex 使用
+
+一个简单的配合 Mutex 使用的例子：
+
+```rust
+use std::sync::{Mutex, Arc};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        // 引用计数加一
+        let counter = Arc::clone(&counter);
+        // 启动一个新子线程，子线程内部操作获取 Mutex 的 lock，然后对其中的数据 num 进行先读后写
+        // 这里不能直接使用 Mutex，而是要套一层 Arc；
+        // 因为直接使用 Mutex 的话，一旦前一次循环把 Mutex 的值 move 走，后面的循环就不能再使用这个 Mutex
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+            // 当前线程结束后，会释放 lock，其它子线程能再获取这个 lock
+        });
+        handles.push(handle);
+    }
+
+    // 等待所有子线程完成
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // 最后输出：Result: 10
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+
 ## 16. 异步
+
+先明确几个概念：
+
+* Future：用来对代码怎么执行进行抽象（只关注 what）
+  * Future 只是描述步骤：”开始做 X，等到 X 做成功后，再做 Y“（而不是「过程式」的运行一段代码：”先执行 X，执行 X 成功后，执行 Y“）
+    * 简单点说，就是用来描述一个状态机
+  * Future 本身不执行代码，Future 只有配合 Executor 才能真正的把代码运行起来
+* Executor：用来真正的把 Future 执行起来（重点关注：when & how：什么时候执行，怎么执行）
+  * 当前 Rust 语言本身只定义 Future 等 traits，Executor 的实现由开源的**异步运行时**库完成
+  * 也就是说一个**异步运行时**库负责实现 Executor
 
 ### a. Future
 
-* Future。Rust 中，Future 是一个 trait，其定义大致（简化版）如下：
+Rust 中，Future 是一个 trait，其定义大致（简化版）如下：
 
 ```rust
 trait Future {
@@ -1700,7 +1778,7 @@ trait Future {
 }
 ```
 
-* 其中 Poll 的定义大致如下：
+其中 Poll 的定义大致如下：
 
 ```rust
 enum Poll<T> {
@@ -1711,53 +1789,102 @@ enum Poll<T> {
 }
 ```
 
-* When a future eventually returns Poll::Ready(T), we say that the future resolves into a T
-  * 翻译：当一个 future 对象完成后，会返回 Poll::Ready(T)，这时我们可以说这个 future 对象被 resolve 成一个类型 T 的返回值
+When a future eventually returns Poll::Ready(T), we say that the future resolves into a T
+
+> 翻译：当一个 future 对象完成后，会返回 Poll::Ready(T)，这时我们可以说这个 future 对象被 resolve 成一个类型 T 的返回值
 
 ### b. async/.await
 
-* async/.await 语句。其中 async 是在 2 个主要场景中被使用，在这 2 个场景中，都会返回一个 Future trait：
+怎么创建一个 Future 来描述一个执行动作（状态机）？Rust 里面使用 async/.await 来创建一个 future。
+
+先分别给一下同步读文件和异步读文件的例子，对比一下看看。
+
+同步：
+
+```rust
+#![allow(unused)]
+
+fn main() {
+    use std::{fs::File, io, io::prelude::*};
+
+    fn read_file(path: &str) -> io::Result<String> {
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        Ok(contents)
+    }
+}
+```
+
+异步（使用 async_std 运行时）：
+
+```rust
+
+#![allow(unused)]
+
+fn main() {
+    extern crate async_std;
+    use async_std::{fs::File, io, io::prelude::*};
+
+    // 实际上时返回一个 Future：Future<Output = io::Result<String>>
+    async fn read_file(path: &str) -> io::Result<String> {
+        // await 是关键，使用了 await 后，等待，直到 open 成功后，Future 才会 Ready(T)
+        let mut file = File::open(path).await?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).await?;
+        Ok(contents)
+    }
+}
+```
+
+下面是 async/.await 语句的详解：
+
+* async 是在 2 个主要场景中被使用，在这 2 个场景中，都会返回一个 Future trait：
   * async fn
   * async blocks（返回这个代码块最后一个表达式的值的 future）
+* 一旦函数或 block 使用了 async 后，使用了 async 的代码就是描述了一个**状态机**
+* 调用 async 的函数体或者代码块，并不会被执行，而是立即返回一个 future 给调用者
+* 想要真正的让 Future 执行，这里给出 2 个方法：
+  * 在 main 中直接使用 block_on 方法（类似同步模式来执行一个 Future，并等待其执行结束）
+  * 在一个 async 代码块中，使用 **.await** 来执行一个 Future，如果最后完成的话，返回 future 的结果
+* 一旦执行 Future 的时候被阻塞（blocked），会 yield （让出）当前线程的控制，Executor 会调度其它的 future 继续执行
+* 直到阻塞（blocked）结束，线程调度器（Executor）负责恢复并继续执行这个 future
 
-例子如下：
+一个简单例子如下：
 
 ```rust
 
 // `foo()` returns a type that implements `Future<Output = u8>`.
 // `foo().await` will result in a value of type `u8`.
-async fn foo() -> u8 { 5 }
+async fn foo() -> u8 {
+    5
+}
 
 fn bar() -> impl Future<Output=u8> {
-    // This `async` block results in a type that implements
-    // `Future<Output = u8>`.
+    // This `async` block results in a type that implements `Future<Output = u8>`.
     async {
+        // 在一个 async 内部，必须使用 .await 来真正执行 future
+        // 等这个 future 执行成功后，会返回这个 future 的值（u8 类型）
         let x: u8 = foo().await;
         x + 5
     }
 }
-
 ```
 
-* 说明：
-  * 调用 async 的函数体或者代码块，并不会被执行，而是立即返回一个 future 给调用者
-  * 当调用者在 future 上用 .await，这段代码块才会被执行
-  * 如果执行 Future 的时候被阻塞（blocked），会 yield （让出）当前线程的控制
-  * 直到阻塞（blocked）结束，线程调度器（executor）会恢复并继续执行这个 future，如果最后完成的话，.await 完成 future，并返回 future 结果
-    * **NOTE**：如果 executor 有多个线程，那么 future 恢复执行后有可能会到另外一个线程里去执行，需要注意线程安全（互斥和死锁）
+> **NOTE**：如果 executor 有多个线程，那么 future 恢复执行后有可能会到另外一个线程里去执行，需要注意线程安全（互斥和死锁）
 
-  ----
+----
 
 * **asynchronous function** 的惯用法：
 
   * 用 async fn 来定义一个函数
-  * 然后在这个函数内部，需要使用「异步」版本的 io 操作（由「异步库」提供，例如：async_std 或 tokio）
-    * 「异步」版本的 io 操作会使用 await 表达式
+  * 然后在这个函数内部，需要使用「异步」版本的 io 操作（由「异步运行时库」提供，例如：async_std 或 tokio）
+    * 「异步」版本的 io，再配合 .await 来使用
     * 「异步」版本的 io 操作，不会直接返回 io 操作结果，而是会返回一个 **future**
   * 当别人调用这个「**asynchronous function**」时，也会立即返回一个这个函数返回值的 future 给调用者
     * **NOTE**：调用时，这个「**asynchronous function**」的函数体并**没有**开始被执行
   * 只有当调用者**第一次** poll 这个 future 时，「**asynchronous function**」的函数体才会开始执行
-  * 调用后，会返回 2 种结果给调用者（「异步」版本的 io 操作之后的 await 表达式）：
+  * 调用后，会返回 2 种结果给调用者：
     * Poll::Pending
     * Poll::Ready
 
@@ -1772,9 +1899,8 @@ fn bar() -> impl Future<Output=u8> {
 * async move 代码块：
 
 ```rust
-/// `async move` block:
-///
-/// 如果某个 `async move` block 使用了外部的 my_string 这个变量后, 其他的 `async move` block 就不能使用这个变量了
+// `async move` block:
+// 如果某个 `async move` block 使用了外部的 my_string 这个变量后, 其他的 `async move` block 就不能使用这个变量了
 
 fn move_block() -> impl Future<Output=()> {
     let my_string = "foo".to_string();
@@ -1787,12 +1913,12 @@ fn move_block() -> impl Future<Output=()> {
 
 ### c. 异步运行时
 
-运行异步代码目前由库来实现，例如：
+运行异步代码目前由库来实现（when，how），例如：
 
 * async-std
 * tokio
 
-这里我们先用 async-std 来举例怎么运行一段异步代码：
+这里我们先用 async-std 来举例怎么运行一段异步代码（task::block_on）：
 
 ```rust
 extern crate async_std;
@@ -1807,7 +1933,9 @@ async fn read_file(path: &str) -> io::Result<String> {
 }
 
 fn main() {
+    // task::spawn 真正的启动异步代码的执行，并返回一个 JoinHandle
     let reader_task = task::spawn(
+        // async block（需要用 async block 来调用 async 函数）返回一个新的 future
         async {
             let result = read_file("data.csv").await;
             match result {
@@ -1816,6 +1944,7 @@ fn main() {
             }
         });
     println!("Started task!");
+    // block_on 方法，等待 JoinHandle 完成（JoinHandle 本身也是一个 future）
     task::block_on(reader_task);
     println!("Stopped task!");
 }
@@ -1825,6 +1954,14 @@ fn main() {
 
 * 先用 task::spawn 启动一段异步代码的运行，返回一个新的 future（async_std::task::JoinHandle 类型）
 * 然后 task::block_on 来等待这个 JoinHandle  类型的 future 运行完成，最后从这个 future 拿到最后的运行结果
+
+总结：
+
+* Future 需要由其它设施来运行；具体到 async-std 运行时，task module 负责运行 future
+
+### d. Under the Hood
+
+（待）
 
 ## 17. Closure
 
