@@ -25,7 +25,7 @@ category: notes
 [17. async](#17-async)  
 [18. closure](#18-closure)  
 [19. iterator](#19-iterator)  
-[20. macros](#20-macros)  
+[20. macros](#20-macros)
 
 ## 1. type
 
@@ -1780,13 +1780,13 @@ fn main() {
 
 先明确几个概念：
 
-* Future：用来对代码怎么执行进行抽象（只关注 what）
-  * Future 只是描述步骤：”开始做 X，等到 X 做成功后，再做 Y“（而不是「过程式」的运行一段代码：”先执行 X，执行 X 成功后，执行 Y“）
+* Future：对**计算**本身的抽象（只关注 what）
+  * Future 只是描述计算本身：”开始做 X，等到 X 做成功后，再做 Y“（而不是「过程式」的运行一段代码：”先执行 X，执行 X 成功后，执行 Y“）
     * 简单点说，就是用来描述一个状态机
-  * Future 本身不执行代码，Future 只有配合 Executor 才能真正的把代码运行起来
+  * Future 本身不执行代码，Future 只有配合 Executor 才能真正的把代码运行起来，推进状态机
 * Executor：用来真正的把 Future 执行起来（重点关注：when & how：什么时候执行，怎么执行）
-  * 当前 Rust 语言本身只定义 Future 等 traits，Executor 的实现由开源的**异步运行时**库完成
-  * 也就是说一个**异步运行时**库负责实现 Executor
+  * 当前 Rust 语言本身只定义 Future 等 traits，Executor 的实现由**异步运行时**库完成
+  * 也就是说由**异步运行时**库负责实现 Executor
 
 ### a. Future
 
@@ -1865,7 +1865,7 @@ fn main() {
   * async blocks（返回这个代码块最后一个表达式的值的 future）
 * 一旦函数或 block 使用了 async 后，使用了 async 的代码就是描述了一个**状态机**
 * 调用 async 的函数体或者代码块，并不会被执行，而是立即返回一个 future 给调用者
-* 想要真正的让 Future 执行，这里给出 2 个方法：
+* 想要真正的让 Future 执行，具体参考异步运行时库的说明，这里列举 2 个例子：
   * 在 main 中直接使用 block_on 方法（类似同步模式来执行一个 Future，并等待其执行结束）
   * 在一个 async 代码块中，使用 **.await** 来执行一个 Future，如果最后完成的话，返回 future 的结果
 * 一旦执行 Future 的时候被阻塞（blocked），会 yield （让出）当前线程的控制，Executor 会调度其它的 future 继续执行
@@ -1978,11 +1978,116 @@ fn main() {
 
 总结：
 
-* Future 需要由其它设施来运行；具体到 async-std 运行时，task module 负责运行 future
+* Future 需要由 Executor 执行；具体到 async-std 运行时，task module 负责运行 future
 
 ### d. Under the Hood
 
-（待）
+Future trait 真实定义如下：
+
+```rust
+#![allow(unused)]
+
+fn main() {
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
+    pub trait Future {
+        type Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context)
+                -> Poll<Self::Output>;
+    }
+}
+```
+
+详解：
+
+* **Output** 是 Future 执行完成后返回的值的类型
+* **Pin 类型**的目的是使得所有的 Future 类型不能被 move，也就是有一个固定的地址，也就是说指向这个地址的指针永远都有效，也就是说可以创建一个**自引用**的 struct。例如：
+
+```rust
+struct MyFut {
+    a: i32,
+    ptr_to_a: *const i32
+}
+```
+
+* 由第 3 方异步运行时库提供的 Executor 负责执行 Future：
+  * 整个状态机由一个最外层 Future，和其它内部 Futures 一起组成
+  * Executor 先做第一次 poll，启动状态机
+  * Executor 然后通过调用 poll 推进状态机，直到整个任务完成
+
+但 Executor 不能用循环重试的方式来不断 poll，而是要通过一种通知机制，当 Future 已经就绪时，才去做 poll。所以又引入了 Waker。下面时一个实现简单 Future 的例子：
+
+```rust
+
+#![allow(unused)]
+
+fn main() {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use std::time::{Duration, Instant};
+    use std::thread;
+
+    struct Delay {
+        when: Instant,
+    }
+
+    // 实现等待未来时刻的 Future
+    impl Future for Delay {
+        type Output = &'static str;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>)
+                -> Poll<&'static str>
+        {
+            if Instant::now() >= self.when {
+                println!("Hello world");
+                Poll::Ready("done")
+            } else {
+                // 先从 Context 中拿到 waker 的句柄
+                let waker = cx.waker().clone();
+                let when = self.when;
+
+                // 生成一个计时器线程，该线程中，一定要做一次 wake()，否则 Executor 就不会收到 Future 完成的通知了
+                thread::spawn(move || {
+                    let now = Instant::now();
+
+                    if now < when {
+                        thread::sleep(when - now);
+                    }
+
+                    // Future 的任务完成以后，调用 wake() 发送通知
+                    waker.wake();
+                });
+
+                // 但此时还是先返回 Pending 的
+                Poll::Pending
+            }
+        }
+    }
+}
+```
+
+* 所以当 Executor 调用 poll 的时候需要提供一个 **Context** 参数
+* 未来当 Future 完成时，可以通过 waker = cx.waker() 和 waker.wake() 通知 Executor 执行完成
+* 具体 waker.wake() 要做什么事情，由 Executor 实现：
+  * 一种可能的实现，就是调用 wake() 把就绪的任务加到**就绪队列**，Executor 消费**就绪队列**中已完成任务，进行 poll
+  * 实现要保证线程安全
+
+* 另外一个 Future 内部实现细节：每次 Executor 调用 poll 时，都会传入一个的 waker 参数；poll 的内部需要判断这次的 waker 和之前 poll 被调用时传入的 waker 的值是否匹配。代码大概如下：
+
+```rust
+fn main() {
+    // 获取原先的 waker
+    let mut waker = waker.lock().unwrap();
+    // 判断原先的 waker 和本次调用传入的 waker 是否匹配
+    if !waker.will_wake(cx.waker()) {
+        // 如果不匹配，需要 clone 本次传入的值，并记录到 Future 内部
+        *waker = cx.waker().clone();
+    }
+}
+```
 
 ## 18. closure
 
