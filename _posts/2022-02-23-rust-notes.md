@@ -2003,12 +2003,15 @@ fn main() {
 详解：
 
 * **Output** 是 Future 执行完成后返回的值的类型
-* **Pin 类型**的目的是使得所有的 Future 类型不能被 move，也就是有一个固定的地址，也就是说指向这个地址的指针永远都有效，也就是说可以创建一个**自引用**的 struct。例如：
+* **Pin 类型**的目的是使得所有的 Future 类型不能被 move，也就是有一个固定的地址，也就是说指向这个地址的指针永远都有效，也就是说可以创建一个 **Self-Referential Structs**（**自引用** struct），后面会详细说。例如：
 
 ```rust
 struct MyFut {
-    a: i32,
-    ptr_to_a: *const i32
+    v: String,
+    // ptr_to_v 是指向第一个字段 v 的指针
+    // 如果没有 Pin 住，一旦 MyFut 被移动，那么 v 的地址就变化了
+    // 但 ptr_to_v 的值没有变化，会造成 ptr_to_v 的值无效
+    ptr_to_v: *mut String
 }
 ```
 
@@ -2017,65 +2020,126 @@ struct MyFut {
   * Executor 先做第一次 poll，启动状态机
   * Executor 然后通过调用 poll 推进状态机，直到整个任务完成
 
-但 Executor 不能用循环重试的方式来不断 poll，而是要通过一种通知机制，当 Future 已经就绪时，才去做 poll。所以又引入了 Waker。下面时一个实现简单 Future 的例子：
+但如果 Executor 通过循环重试的方式来不断 poll 效率太低。高效的方式是通过某种通知机制，当 Future 已经就绪时，才去做 poll。所以又引入了 Waker：
+
+* 当 Executor 调用 poll 的时候需要提供一个 **Context** 参数
+
+* 未来当 Future 完成时，可以通过 waker = cx.waker() 配合调用 waker.wake() 来通知 Executor 执行 poll
+
+* 具体 waker.wake() 要怎么通知，由 Executor 实现：
+  * 一种可能的实现，就是调用 wake() 把就绪的任务加到**就绪队列**，Executor 消费**就绪队列**中已完成任务，进行 poll
+  * 实现要保证线程安全
+
+先展示一个简单的，不断 wake  Executor 做 poll 的例子：
 
 ```rust
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-#![allow(unused)]
+#[tokio::main]
+async fn main() {
+    let fut = MyFuture {};
+    println!("Awaiting fut...");
+    fut.await;
+    println!("Awaiting fut... done!");
+}
 
-fn main() {
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-    use std::time::{Duration, Instant};
-    use std::thread;
+// 声明一个自己的 Future
+struct MyFuture {}
 
-    struct Delay {
-        when: Instant,
-    }
+// 实现 Future trait
+impl Future for MyFuture {
+    // 该 Future 返回 ()
+    type Output = ();
 
-    // 实现等待未来时刻的 Future
-    impl Future for Delay {
-        type Output = &'static str;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>)
-                -> Poll<&'static str>
-        {
-            if Instant::now() >= self.when {
-                println!("Hello world");
-                Poll::Ready("done")
-            } else {
-                // 先从 Context 中拿到 waker 的句柄
-                let waker = cx.waker().clone();
-                let when = self.when;
-
-                // 生成一个计时器线程，该线程中，一定要做一次 wake()，否则 Executor 就不会收到 Future 完成的通知了
-                thread::spawn(move || {
-                    let now = Instant::now();
-
-                    if now < when {
-                        thread::sleep(when - now);
-                    }
-
-                    // Future 的任务完成以后，调用 wake() 发送通知
-                    waker.wake();
-                });
-
-                // 但此时还是先返回 Pending 的
-                Poll::Pending
-            }
-        }
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        println!("MyFuture::poll()");
+        // 如果没有 wake_by_ref() 的话，poll 就只会被调用一次
+        // 现在加上了 wake_by_ref()，每次 poll 时，会再次通知 Executor 进行下一次 poll，Executor 会再次调用 poll
+        cx.waker().wake_by_ref();
+        // 但该例子中，无论 poll 多少次都返回 Pending，不会返回 Ready：无限次调用 poll
+        Poll::Pending
     }
 }
 ```
 
-* 所以当 Executor 调用 poll 的时候需要提供一个 **Context** 参数
-* 未来当 Future 完成时，可以通过 waker = cx.waker() 和 waker.wake() 通知 Executor 执行完成
-* 具体 waker.wake() 要做什么事情，由 Executor 实现：
-  * 一种可能的实现，就是调用 wake() 把就绪的任务加到**就绪队列**，Executor 消费**就绪队列**中已完成任务，进行 poll
-  * 实现要保证线程安全
+执行以后的无限次 poll 的效果如下：
 
-* 另外一个 Future 内部实现细节：每次 Executor 调用 poll 时，都会传入一个的 waker 参数；poll 的内部需要判断这次的 waker 和之前 poll 被调用时传入的 waker 的值是否匹配。代码大概如下：
+```shell
+$ cargo run --quiet
+Awaiting fut...
+MyFuture::poll()
+MyFuture::poll()
+MyFuture::poll()
+MyFuture::poll()
+MyFuture::poll()
+MyFuture::poll()
+MyFuture::poll()
+MyFutur^C
+```
+
+然后再展示一个例子：启动一秒以后，能返回 Ready 的 Future：
+
+```rust
+use tokio::time::Sleep;
+use tokio::time::Duration;
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+#[tokio::main]
+async fn main() {
+    let fut = MyFuture::new();
+    println!("Awaiting fut...");
+    fut.await;
+    println!("Awaiting fut... done!");
+}
+
+struct MyFuture {
+    // 需要 Pin 和 Box 配合使用（后面会详细说）
+    sleep: Pin<Box<Sleep>>,
+}
+
+impl MyFuture {
+    fn new() -> Self {
+        Self {
+            // 使用 tokio 异步版本的 sleep
+            sleep: Box::pin(tokio::time::sleep(Duration::from_secs(1))),
+        }
+    }
+}
+
+impl Future for MyFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        println!("MyFuture::poll()");
+        // 异步版本的 sleep，需要 Pin 和 Box 配合使用
+        let sleep = Pin::new(&mut self.sleep);
+        // 异步版本 sleep 内部实现了利用 waker 来通知 Executor
+        // 直接对异步版本的 sleep 进行 poll
+        sleep.poll(cx)
+    }
+}
+```
+
+执行效果如下：
+
+```shell
+$ cargo run --quiet
+Awaiting fut...
+MyFuture::poll()
+这里会卡 1 秒
+MyFuture::poll()
+Awaiting fut... done!
+```
+
+* 另外一个之前例子没有覆盖的 Future 内部实现细节：每次 Executor 调用 poll 时，都会传入一个的 waker 参数；poll 的内部需要判断这次的 waker 和之前 poll 被调用时传入的 waker 的值是否匹配。代码大概如下：
 
 ```rust
 fn main() {
@@ -2088,6 +2152,61 @@ fn main() {
     }
 }
 ```
+
+### e. Pin
+
+最后再详细说一下 Future 为啥会用到 **Pin** 。
+
+先看一下异步代码（async fn 或 async block）怎么实现状态机，详情可参考：[The Async/Await Pattern](https://os.phil-opp.com/async-await/#the-async-await-pattern)。
+
+这里举个 async block 的简单例子：
+
+```rust
+async fn pin_example() -> i32 {
+    let array = [1, 2, 3];
+    let element = &array[2];
+    async_write_file("foo.txt", element.to_string()).await;
+    *element
+}
+```
+
+编译器在对这个 async block 生成状态机时：
+
+* 先生成一个有 3 个状态的状态机：StartState，WaitingOnWriteState，EndState
+* 对每个状态，需要定义对应的 struct 来保存该状态所需要的数据：
+
+```text
+// StartState 和 EndState 这 2 个状态不使用数据，忽略
+
+// WaitingOnWriteState 状态对应的 struct 如下：
+struct WaitingOnWriteState {
+    array: [1, 2, 3],
+    // 0x1001c is the address of the last array element
+    element: 0x1001c,
+}
+```
+
+可以看出，该 async block 的状态机的底层实现中，可能会使用到 **Self-Referential Structs**（自引用 struct）。要解决 **Self-Referential Structs** 被 move 时的问题，可能的解决方法有：
+
+* 每次 move 时，修改指针指向的地址；但这个方法付出的运行时性能代价高
+* 指针不储存绝对地址，只储存偏移量；这样需要编译器针对  **Self-Referential Structs** 做专门的处理，编译器实现代价高
+* Rust 最终采用 **Pin** 来解决问题：由开发者来标记那些不能被 move 的地址；编译器实现简单，且运行时付出的性能代价为 0
+  * 代价就是开发者需要学习 Pin 的用法
+
+----
+
+Pin 使用相关：
+
+* **Unpin** trait：一旦实现了这个 trait，标记该类型被 move 是安全的。事实上，Rust 中大多数类型都实现了这个 trait（[**auto trait**](https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits)）
+* **!Unpin**：要想标记一个类型不能被 move，这个类型需要被标记为：**!Unpin**
+  * 例如：实现一个在堆上安全使用的 **Self-Referential Struct**（Box\<T>），可以把 struct T 标记为 **!Unpin**，之后就不能从 Pin\<Box\<T>> 中获取到 &mut T，保证其内部自引用始终有效
+
+----
+
+总结如下：
+
+* Pin 提供了一种约束机制来保证安全：如果某种场景有 move 造成指针无效的风险（**未定义行为**），那么可以使用 Pin 来保证安全
+* 更多细节可**参考**：[Pin and suffering](https://fasterthanli.me/articles/pin-and-suffering)
 
 ## 18. closure
 
