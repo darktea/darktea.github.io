@@ -7,8 +7,8 @@ category: notes
 ## 目录
 
 [1. type](#1-type)  
-[2. copy / move / clone](#2-copy--move--clone)  
-[3. ownership](#3-ownership)  
+[2. ownership](#2-ownership)  
+[3. move](#3-move)  
 [4. borrowing](#4-borrowing)  
 [5. references](#5-references)  
 [6. lifetime](#6-lifetime)  
@@ -37,53 +37,76 @@ category: notes
 * 复合类型：tup, array（stack上，固定长度）
 * 字符串常量（string literal）vs. String 类型：前者在栈上（运行期不可变），后者在堆上（运行期可变）
 
-## 2. copy / move / clone
+## 2. ownership
 
-针对 stack 上的数据会发生 copy。heap 上的数据会发生 move。例如：
+> **Note**：「变量」（variable）拥有「值」（value）
+
+所有权（ownership）3 原则：
+
+1. Rust 中每一个值都有一个称之为其「所有者」（owner）的「变量」
+2. 「值」有且只能有一个所有者（「变量」）
+3. 当所有者（「变量」）离开作用域，这个「值」将被丢弃，同时其资源也被释放
+
+> **思考**：使用 C 语言的时候，如果遵循这 3 个原则来使用指针？
+
+对复合数据结构，所有权可以是「树状结构」。例如：
 
 ```rust
 #![allow(unused)]
 
 fn main() {
-// copy
-    let x = 5; // bind the value 5 to x
-    let y = x; // make a COPY of the value in x and bind it to y
+    // 定义一个 struct：Person
+    struct Person {
+        name: String,
+        birth: i32
+    }
 
-// move
-    let s1 = String::from("hello");
-    let s2 = s1; // s1 was moved into s2。之后 s1 不再有效
+    // 使用 let 来创建值或者资源，同时该「变量」成为「值」的 owner
+    // 一个 Person 的 Vector
+    let mut composers = Vec::new();
 
-// clone
-    let s1 = String::from("hello");
-    let s2 = s1.clone();
+    // Vector 中放入 3 个 structs
+    composers.push(Person { name: "Palestrina".to_string(), birth: 1525 });
+    composers.push(Person { name: "Dow".to_string(), birth: 1563 });
+    composers.push(Person { name: "Lully".to_string(), birth: 1632 });
+
+    // composers 是所有权树的 root，其拥有 3 个 structs
+    // 每个 struct 又拥有 2 个字段
+    // struct 中的字段 name，又拥有其对应的「值」（文本内容）
+    // 从而形成了一个「所有权树」
 }
+// 离开作用域，从所有权树的 root 节点 composers 开始释放整个树
 ```
 
-## 3. ownership
+另外一个例子，使用了 Box 类型：
 
-* 所有权（ownership）3 原则
-  * Rust 中每一个值都有一个称之为其「所有者」（owner）的变量
-    * 使用 let 来创建值或者资源，同时该变量成为资源的 owner
-  * 值有且只能有一个所有者（变量）。
-    * 当值从一个变量 **move** 给另外一个值时，所有权转移
-    * 不过除了 **move** 之外，可以 **borrow** 一个值（后面会详细说）
-  * 当所有者（变量）离开作用域，这个值将被丢弃，同时其资源也被释放
+```rust
+#![allow(unused)]
 
-> **NOTE**：思考一下，我们使用 C 语言的时候，如果遵循这 3 个原则来使用指针？
+fn main() {
+    // A Box<T> is a pointer to a value of type T stored on the heap
+    // Box::new 在 heap 上给一个 tuple 分配空间，然后指向分配的空间的指针
+    let point = Box::new((0.625, 0.5));
+}
+// 离开作用域，释放 head 上分配的空间
+```
 
-* **move**：通过赋值（=）实现了堆上数据的拥有者（变量）的所有权的转移（类似 C 语言中的「浅拷贝」）
-  * 一旦某个变量的所有权转移（move）走了以后，就不能再使用这个变量了
-* 【move】和【copy】
-  * 默认的赋值语句是 move（移动）
-  * 可以通过实现 Copy trait 把默认的 move 改成 copy（复制，所谓的深拷贝）
-  * **栈上**的变量的赋值都是 copy
-* Copy trait 继承了 Clone trait
-* **函数参数**的 move：就像赋值语句一样，栈上的是深拷贝，堆上的浅拷贝
-* **函数返回值** move：就像赋值语句一样，栈上的是深拷贝，堆上的浅拷贝
+除了上面的基本规则，ownership 还有几个扩展概念，这里只提一下，后面的章节会深入细节：
 
-> NOTE：一旦离开作用域，所有者（变量）拥有的堆上数据被释放（类似 C 语言的 free）
+* 可以把「值」从一个 owner 移交给另外一个 owner，也就是 **move**
+* 一些简单类型（Integer，char），默认不遵守所有权规则，这些类型统称为 **Copy Type**
+* 利用 Rc，Arc 等指针机制，一个「值」可以有几个 owners
+* 除了 own 一个值，Rust 还提供了另外一种机制来访问值：**borrow**
 
-* 在【函数】和【闭包】中，在入参是 move 的场景（而不是 borrow 的场景），进入函数后，参数和返回值的 owner 关系发生改变，原先的变量可能不再有效
+## 3. move
+
+* **move**：把「值」的所有权转移给另外一个「变量」（owner）（类似 C 语言中的「浅拷贝」）
+  * 赋值（=），传递「函数参数」，返回「函数返回值」都会发生 move
+* 一旦某个「变量」的所有权转移（move）走了以后，该「变量」失效，不能再使用这个「变量」
+  * 例如：在【函数】和【闭包】中，在入参是 move 的场景（而不是 borrow 的场景），进入函数后，参数和返回值的 owner 关系发生改变，原先的变量不再有效
+* 可以通过实现 Copy trait 把默认的 move 改成 copy（复制，所谓的深拷贝）
+  * Rust 中，一些简单类型，默认实现了 Copy trait，这些类型统称为 **Copy Type**
+  * Copy trait 继承了 Clone trait
 
 一个函数入参是 move 的例子：
 
@@ -104,6 +127,31 @@ fn calculate_length(s: String) -> usize {
     // 当函数结束的时候，这个字符串被 dropped
 }
 ```
+
+* 和大部分类型不同，Copy Type（integers）不使用 move 规则，而是进行 copy。例如：
+
+```rust
+#![allow(unused)]
+
+fn main() {
+    // copy
+    let x = 5; // bind the value 5 to x
+    let y = x; // make a COPY of the value in x and bind it to y
+
+    // move
+    let s1 = String::from("hello");
+    let s2 = s1; // s1 was moved into s2。之后 s1 不再有效
+
+    // clone
+    let s1 = String::from("hello");
+    let s2 = s1.clone();
+}
+```
+
+其它一些要点：
+
+* 不能把 Vector 中的单个 element move out。例如：let third = v[2]
+  * 这种场景可以 borrow 值。除了 **move** 之外，还可以 **borrow** 一个「值」（后面会详细说）
 
 ## 4. borrowing
 
@@ -141,7 +189,9 @@ fn change(some_string: &mut String) {
 }
 ```
 
-> NOTE：为啥不需要对这个可变引用进行 deference（类似 C 语言中的 * 操作符）？
+> **NOTE**：
+>
+> 为啥不需要对这个可变引用进行 deference（类似 C 语言中的 * 操作符）？
 >
 > (*some_string).push_str(", world");
 >
@@ -183,13 +233,14 @@ fn main() {
 }
 ```
 
-* 引用两原则
-  * At any given time, you can have either (but not both of) one mutable reference or any number of immutable references
-    * 在给定作用域中的给定值有且只有一个「可变引用」
-    * if we have an immutable reference to something, we cannot also take a mutable reference
-  * References must always be valid
-    * 值的生命周期必须比指向它的引用的生命周期大（outlives）
-    * 如果被引用的变量失效了，这个引用也就失效了
+引用两原则：
+
+* At any given time, you can have either (but not both of) one mutable reference or any number of immutable references
+  * 在给定作用域中的给定值有且只有一个「可变引用」
+  * if we have an immutable reference to something, we cannot also take a mutable reference
+* References must always be valid
+  * 值的生命周期必须比指向它的引用的生命周期大（outlives）
+  * 如果被引用的变量失效了，这个引用也就失效了
 
 ## 6. lifetime
 
@@ -317,10 +368,11 @@ struct S<'a, 'b> {
 
 ## 7. pointers
 
-* Rust 中的指针有 3 种：
-  * 【引用】：Rust 中安全的指针。也就是【非所有权指针】，分 &T 和 &mut T 两种。其中 &T 本身是一种 Copy 类型；而 &mut T 并没有实现 Copy Trait（Copy **trait** 的细节请参考其他小节）
-  * 【原始指针】：也就是 Raw Points，用于 unsafe 代码；这里不详细介绍了
-  * 【智能指针】：智能指针的 2 个关键 **trait**：Drop（离开作用域后，自动释放资源） 和 Deref。标准库提供了几种智能指针：Box\<T>，Rc\<T>，Arc\<T>，Cell\<T>，RefCell\<T>
+Rust 中的指针有 3 种：
+
+* 【引用】：Rust 中安全的指针。也就是【非所有权指针】，分 &T 和 &mut T 两种。其中 &T 本身是一种 Copy 类型；而 &mut T 并没有实现 Copy Trait（Copy **trait** 的细节请参考其他小节）
+* 【原始指针】：也就是 Raw Points，用于 unsafe 代码；这里不详细介绍了
+* 【智能指针】：智能指针的 2 个关键 **trait**：Drop（离开作用域后，自动释放资源） 和 Deref。标准库提供了几种智能指针：Box\<T>，Rc\<T>，Arc\<T>，Cell\<T>，RefCell\<T>
 
 这里只先给一个使用 Box 的例子，不深入更多具体细节了。
 
@@ -1621,8 +1673,8 @@ fn main() {
 
 Rust 线程间的通讯需要使用 channel。注意：
 
-* 不推荐使用 std::sync::mpsc，已经过期了
-* 推荐使用 **crossbeam::channel**
+* 不推荐使用 std::sync::mpsc
+* 推荐使用 **crossbeam::channel**（性能好，功能多；唯一的缺点可能只有不是标准库）
 
 > A channel is a one-way conduit for sending values from one thread to another（Rust 保证 channel 线程安全）
 
@@ -1979,6 +2031,7 @@ fn main() {
 总结：
 
 * Future 需要由 Executor 执行；具体到 async-std 运行时，task module 负责运行 future
+* 异步代码等待时不能 block Executor
 
 ### d. Under the Hood
 
@@ -2039,6 +2092,7 @@ use std::{
     task::{Context, Poll},
 };
 
+// 这个例子中，我们使用 tokio 作为运行时来执行 Future
 #[tokio::main]
 async fn main() {
     let fut = MyFuture {};
@@ -2109,6 +2163,8 @@ impl MyFuture {
     fn new() -> Self {
         Self {
             // 使用 tokio 异步版本的 sleep
+            // Box::pin 创建一个 Pin<Box<T>，如果 T 没有实现 Unpin 的话，Pin 成功
+            // 本例子 Pin<Box<Sleep>> 中的 Sleep 类型就是没有实现 Unpin 的类型
             sleep: Box::pin(tokio::time::sleep(Duration::from_secs(1))),
         }
     }
@@ -2119,11 +2175,13 @@ impl Future for MyFuture {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         println!("MyFuture::poll()");
+        // 这个一个典型的惯用法：Future 的实现里面对另外一个 future 进行 poll
+        //
+        // 因为异步版本的 sleep 内部实现了利用 waker 来通知 Executor
+        // 所以可以直接对异步版本的 sleep 进行 poll
+        //
         // 异步版本的 sleep，需要 Pin 和 Box 配合使用
-        let sleep = Pin::new(&mut self.sleep);
-        // 异步版本 sleep 内部实现了利用 waker 来通知 Executor
-        // 直接对异步版本的 sleep 进行 poll
-        sleep.poll(cx)
+        self.sleep.as_mut().poll(cx)
     }
 }
 ```
@@ -2155,58 +2213,135 @@ fn main() {
 
 ### e. Pin
 
-最后再详细说一下 Future 为啥会用到 **Pin** 。
+最后再详细说一下 **Pin** 相关的细节。
 
-先看一下异步代码（async fn 或 async block）怎么实现状态机，详情可参考：[The Async/Await Pattern](https://os.phil-opp.com/async-await/#the-async-await-pattern)。
+#### i. movable
 
-这里举个 async block 的简单例子：
+进入本节之前，建议到 [3. move](#3-move)  复习一下 move 的概念。
+
+通过一个例子详解 move 的细节：
 
 ```rust
-async fn pin_example() -> i32 {
-    let array = [1, 2, 3];
-    let element = &array[2];
-    async_write_file("foo.txt", element.to_string()).await;
-    *element
+#![allow(unused)]
+
+fn main() {
+    // s1 (变量) 是 String `hello` (值) 的 owner
+    // 底层的实现大概是：`hello` 被存放在分配在 heap 上的空间
+    // s1 是个肥指针：记录了字符串长度，字符串存放空间的地址等信息
+    let s1 = String::from("hello");
+
+    // 进行 move：s1 记录的所有数据被 copy 给了 s2（字符串程度，字符串存放空间的地址）
+    // 移动以后可以安全的使用 s2
+    // 这是因为 String `hello` 本身的地址没有变化，可以通过 s2 被安全的继续使用
+    let s2 = s1;
 }
 ```
 
-编译器在对这个 async block 生成状态机时：
+就上面的例子来说，String 类型是一个 movable（可移动）的类型。
 
-* 先生成一个有 3 个状态的状态机：StartState，WaitingOnWriteState，EndState
-* 对每个状态，需要定义对应的 struct 来保存该状态所需要的数据：
+> movable（可移动）：所谓一个类型 movable，是指一旦拿到这个类型的「值」的 ownership 或 &mut（独占指针），就可以安全的进行 move
 
-```text
-// StartState 和 EndState 这 2 个状态不使用数据，忽略
+正常来说，Rust 中的所有类型都应该是「可移动」的。
 
-// WaitingOnWriteState 状态对应的 struct 如下：
-struct WaitingOnWriteState {
-    array: [1, 2, 3],
-    // 0x1001c is the address of the last array element
-    element: 0x1001c,
+但有例外的场景，某些类型被移动后，会有问题。比如涉及到 **Self-Referential Structs**（自引用 structs），move 就可能有问题了。
+
+类似下面这种 struct：一个字段指向另外一个字段
+
+```rust
+struct Test {
+    a: String,
+    b: *const String,
 }
 ```
 
-可以看出，该 async block 的状态机的底层实现中，可能会使用到 **Self-Referential Structs**（自引用 struct）。要解决 **Self-Referential Structs** 被 move 时的问题，可能的解决方法有：
+具体问题参考文档：[Pinning in Detail](https://rust-lang.github.io/async-book/04_pinning/01_chapter.html#pinning-in-detail)，看了它这个文档里面的图就一目了然了：
+
+![img](https://rust-lang.github.io/async-book/assets/swap_problem.jpg)
+
+所以 **Self-Referential Structs** 可能会引起 move 后的指针无效的问题。该问题可能的解决方法有：
 
 * 每次 move 时，修改指针指向的地址；但这个方法付出的运行时性能代价高
-* 指针不储存绝对地址，只储存偏移量；这样需要编译器针对  **Self-Referential Structs** 做专门的处理，编译器实现代价高
-* Rust 最终采用 **Pin** 来解决问题：由开发者来标记那些不能被 move 的地址；编译器实现简单，且运行时付出的性能代价为 0
+* 指针不储存绝对地址，只储存偏移量；这样需要编译器针对 **Self-Referential Structs** 做专门的处理，编译器实现代价高
+* Rust 采用 **Pin** 机制来解决问题：开发者负责把不能被 move 的类型标记出来；从编译层面对这些被标记了的类型进行限制：使得没有办法对这些类型做 move 动作
+  * 运行时付出的性能代价为 0
   * 代价就是开发者需要学习 Pin 的用法
 
-----
+#### ii. Pin 的定义
 
-Pin 使用相关：
+> 核心理念：
+>
+> 要限制一个类型 T 不能被 move，也就是要对这个类型 T 的访问进行限制：只要不能拿到到这个类型 T 的 ownership 或者 &mut T（独占指针）就行了。
+>
+> 在 Pin 机制中，只要利用 Pin 把这个类型 T 包起来（或者说屏蔽起来）就能实现这个限制效果。
 
-* **Unpin** trait：一旦实现了这个 trait，标记该类型被 move 是安全的。事实上，Rust 中大多数类型都实现了这个 trait（[**auto trait**](https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits)）
-* **!Unpin**：要想标记一个类型不能被 move，这个类型需要被标记为：**!Unpin**
-  * 例如：实现一个在堆上安全使用的 **Self-Referential Struct**（Box\<T>），可以把 struct T 标记为 **!Unpin**，之后就不能从 Pin\<Box\<T>> 中获取到 &mut T，保证其内部自引用始终有效
+Pin 的定义：
 
-----
+```rust
+// 一个包了指针的 struct
+pub struct Pin<P> {
+    pointer: P,
+}
+```
 
-总结如下：
+* Pin **自己是一个指针**，Pin 本身实现了 Deref 和 DerefMut，
+* P **必须是一个指针**，也就是实现了 Deref 或 DerefMut 的类型。例如：Box\<T>
 
-* Pin 提供了一种约束机制来保证安全：如果某种场景有 move 造成指针无效的风险（**未定义行为**），那么可以使用 Pin 来保证安全
-* 更多细节可**参考**：[Pin and suffering](https://fasterthanli.me/articles/pin-and-suffering)
+那怎么用 Pin 把需要限制的类型 T 包起来（屏蔽起来）？
+
+* 因为 P 只能包一个指针，所以先要构建一个指向 T 的指针 P。可以构建 2 种指针：
+  * &mut T：「可变引用」实际上就是 T 的「独占指针」
+  * Pin\<Box\<T>>：使用智能指针 Box
+* 然后再用 Pin 把构建好的指针类型 P 包起来。既然有 2 种指针类型，那么也有 2 种 Pin：
+  * Pin<&mut T>：但这种方式坑多，使用起来需要很小心，**一般不推荐使用这种方法**
+  * Pin\<Box\<T>>：可以使用标准库 Box::pin 函数来构建。得到一个在 heap 上的 T 的值，然后这个值被 Pin 包起来
+    * **推荐使用这种方法**
+
+#### iii. Unpin and !Unpin
+
+上一节已经说明了使用 Pin 机制，可以把不能 movable 的类型封装到 Pin 中，从而限制去获取 T 的 ownership 或者 &mut T（独占指针），进而保证不会产生 move 问题。
+
+但还需要进一步说明一下 Pin 机制的具体**原则**（引入了 Unpin 和 !Unpin 的概念）。
+
+> Pin 的**原则**：
+>
+> 如果 Pin 包住的类型 T （比如 Pin<&mut T> 中的 T）实现了 Unpin trait，那么可以直接从 Pin<&mut T> 中获取到 T 的 ownership 或者 &mut T（独占指针）
+>
+> 只有当 Pin 包住的类型 T （例如 Pin\<Box\<T>> 中的 T）实现了 !Unpin trait，才会限制去获取 T 的 ownership 或者 &mut T（独占指针）
+
+而 Rust 中绝大多数正常类型，都是 movable 的。所以，Rust 中大多数类型都已经实现了 Unpin trait（[**auto trait**](https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits)）。
+
+比如 String 类型实现了 Unpin，可以 通过 Pin 机制，使用多种方从 Pin 中拿到 String 进行操作:
+
+```rust
+#![allow(unused)]
+
+fn main() {
+    let mut string = "Pinned?".to_string();
+
+    // 构建 Pin<&mut T>
+    let mut pinned: Pin<&mut String> = Pin::new(&mut string);
+    // String 实现了 Unpin，所以不受限制
+    // 可以直接从 Pin<&mut T> 拿到内部真正的 T String，进行操作
+    pinned.push_str(" Not");
+
+    // 也提供了 Pin::into_inner 方法来返回指针 P
+    // 调用 Pin::into_inner 也 move（并消耗掉）入参 pinned 的所有权
+    Pin::into_inner(pinned).push_str(" so much.");
+    let new_home = string;
+    assert_eq!(new_home, "Pinned? Not so much.");
+}
+```
+
+> 甚至 Pin 本身也自动实现了 Unpin：只是用想通过 Pin 来限制 T，T 确实要实现 !Unpin，但 Pin 没有实现 !Unpin 的必要
+
+在 Rust 中，真正实现了 !Unpin trait 的只有 2 个类型（这里只先提一下，下一节会详细讲）：
+
+* Future 转换为状态机时，编译器生成的 **Self-Referential Structs** 来保存状态机数据，编译器会给这些 **Self-Referential Structs** 会实现 !Unpin trait
+* 标准库中的 std::marker::PhantomPinned 类型
+
+#### iv. Future and Pin
+
+（待）
 
 ## 18. closure
 
