@@ -4,6 +4,8 @@ title: Rust Notes
 category: notes
 ---
 
+# Rust Notes
+
 ## 目录
 
 [1. type](#1-type)  
@@ -1832,11 +1834,11 @@ fn main() {
 
 先明确几个概念：
 
-* Future：对**计算**本身的抽象（只关注 what）
+* Future：对**计算**本身的抽象（重点关注 what：计算什么）
   * Future 只是描述计算本身：”开始做 X，等到 X 做成功后，再做 Y“（而不是「过程式」的运行一段代码：”先执行 X，执行 X 成功后，执行 Y“）
     * 简单点说，就是用来描述一个状态机
   * Future 本身不执行代码，Future 只有配合 Executor 才能真正的把代码运行起来，推进状态机
-* Executor：用来真正的把 Future 执行起来（重点关注：when & how：什么时候执行，怎么执行）
+* Executor：用来真正的把 Future 执行起来（重点关注：when & how：计算什么时候执行，怎么执行）
   * 当前 Rust 语言本身只定义 Future 等 traits，Executor 的实现由**异步运行时**库完成
   * 也就是说由**异步运行时**库负责实现 Executor
 
@@ -1855,20 +1857,20 @@ trait Future {
 
 ```rust
 enum Poll<T> {
-    // future 完成时返回 Ready
+    // Future 完成时返回 Ready
     Ready(T),
-    // future 还没有完成的话，返回 Pending
+    // Future 还没有完成的话，返回 Pending
     Pending
 }
 ```
 
 When a future eventually returns Poll::Ready(T), we say that the future resolves into a T
 
-> 翻译：当一个 future 对象完成后，会返回 Poll::Ready(T)，这时我们可以说这个 future 对象被 resolve 成一个类型 T 的返回值
+> 翻译：当一个 Future 实例完成后，会返回 Poll::Ready(T)，这时我们可以说这个 Future 实例被 resolve 成一个类型 T 的返回值
 
 ### b. async/.await
 
-怎么创建一个 Future 来描述一个执行动作（状态机）？Rust 里面使用 async/.await 来创建一个 future。
+怎么创建一个 Future 来描述一个执行动作（状态机）？Rust 里面使用 async/.await 来创建一个 Future。
 
 先分别给一下同步读文件和异步读文件的例子，对比一下看看。
 
@@ -1889,7 +1891,7 @@ fn main() {
 }
 ```
 
-异步（使用 async_std 运行时）：
+异步（使用 async_std **异步运行时**库）：
 
 ```rust
 
@@ -1901,7 +1903,11 @@ fn main() {
 
     // 实际上时返回一个 Future：Future<Output = io::Result<String>>
     async fn read_file(path: &str) -> io::Result<String> {
-        // await 是关键，使用了 await 后，等待，直到 open 成功后，Future 才会 Ready(T)
+        // 可以把整个 read_file 异步函数理解成一个状态机。
+
+        // File::open(path) 本身返回一个 Future
+        // .await 是关键，使用了 .await 后，当真正执行到这里时，状态机进入等待状态
+        // 直到 open 成功后，能拿到 Ready(T) 中的 T：file。然后，状态机才会继续推进 
         let mut file = File::open(path).await?;
         let mut contents = String::new();
         file.read_to_string(&mut contents).await?;
@@ -1916,14 +1922,14 @@ fn main() {
   * async fn
   * async blocks（返回这个代码块最后一个表达式的值的 future）
 * 一旦函数或 block 使用了 async 后，使用了 async 的代码就是描述了一个**状态机**
-* 调用 async 的函数体或者代码块，并不会被执行，而是立即返回一个 future 给调用者
-* 想要真正的让 Future 执行，具体参考异步运行时库的说明，这里列举 2 个例子：
+* 调用 async 的函数体或者代码块，并不会被执行，而是立即返回一个 Future 给调用者
+* 想要真正的让 Future 执行，具体参考**异步运行时**库的说明，这里列举 2 个例子：
   * 在 main 中直接使用 block_on 方法（类似同步模式来执行一个 Future，并等待其执行结束）
-  * 在一个 async 代码块中，使用 **.await** 来执行一个 Future，如果最后完成的话，返回 future 的结果
-* 一旦执行 Future 的时候被阻塞（blocked），会 yield （让出）当前线程的控制，Executor 会调度其它的 future 继续执行
-* 直到阻塞（blocked）结束，线程调度器（Executor）负责恢复并继续执行这个 future
+  * 在一个 async 代码块中，使用 **.await** 来执行一个 Future，如果最后完成的话，返回 Future 的结果
+* 一旦执行 Future 的时候被阻塞（blocked），会 yield （让出）当前线程的控制，Executor 会调度其它的 Future 继续执行
+* 直到阻塞（blocked）结束，线程调度器（Executor）负责恢复并继续执行这个 Future
 
-一个简单例子如下：
+再看一个简单例子：
 
 ```rust
 
@@ -1937,37 +1943,31 @@ fn bar() -> impl Future<Output=u8> {
     // This `async` block results in a type that implements `Future<Output = u8>`.
     async {
         // 在一个 async 内部，必须使用 .await 来真正执行 future
-        // 等这个 future 执行成功后，会返回这个 future 的值（u8 类型）
+        // 等这个 Future 执行成功后，会返回这个 Future 的值（u8 类型）
         let x: u8 = foo().await;
         x + 5
     }
 }
 ```
 
-> **NOTE**：如果 executor 有多个线程，那么 future 恢复执行后有可能会到另外一个线程里去执行，需要注意线程安全（互斥和死锁）
+> **NOTE**：如果 executor 有多个线程，那么 Future 恢复执行后有可能会到另外一个线程里去执行，需要注意线程安全（互斥和死锁）
 
 ----
 
 * **asynchronous function** 的惯用法：
 
-  * 用 async fn 来定义一个函数
-  * 然后在这个函数内部，需要使用「异步」版本的 io 操作（由「异步运行时库」提供，例如：async_std 或 tokio）
-    * 「异步」版本的 io，再配合 .await 来使用
-    * 「异步」版本的 io 操作，不会直接返回 io 操作结果，而是会返回一个 **future**
-  * 当别人调用这个「**asynchronous function**」时，也会立即返回一个这个函数返回值的 future 给调用者
-    * **NOTE**：调用时，这个「**asynchronous function**」的函数体并**没有**开始被执行
-  * 只有当调用者**第一次** poll 这个 future 时，「**asynchronous function**」的函数体才会开始执行
-  * 调用后，会返回 2 种结果给调用者：
-    * Poll::Pending
-    * Poll::Ready
+  * 开发者使用 async fn 来定义一个异步函数，异步函数返回一个 Future。然后需要由**异步运行时**库来真正执行这个 Future
+  * 在异步函数内部，需要使用「异步」版本的 IO 函数（由**异步运行时**库提供，例如：async_std 或 tokio）
+    * 「异步」版本的 IO 函数不会直接返回 IO 操作结果，而是会返回一个异步 IO Future
+    * 再配合 .await 使用异步 IO Future，执行时等待异步 IO 成功后，会返回异步 IO 的结果
 
-  ----
+----
 
 * 生命周期
-  * async fn 的入参如果是  non-'static 参数（例如：引用参数），那么这个 async fn 返回的 Future 的生命周期需要被限制在函数入参的生命周期之内
-    * 换句话说，当在这个 future 上做 .await 的时候，当初调用这个 async fn 时的入参的生命周期必须仍然有效
+  * async fn 的入参如果是  non-'static 参数（非 static 生命周期的参数），那么这个 async fn 返回的 Future 的生命周期需要被限制在函数入参的生命周期之内
+    * 换句话说，当在这个 Future 上做 .await 的时候，当初调用这个 async fn 时的入参的生命周期必须仍然有效
 
-  ----
+----
 
 * async move 代码块：
 
@@ -1986,7 +1986,7 @@ fn move_block() -> impl Future<Output=()> {
 
 ### c. 异步运行时
 
-运行异步代码目前由库来实现（when，how），例如：
+运行异步代码目前由库来实现，例如：
 
 * async-std
 * tokio
@@ -2033,7 +2033,206 @@ fn main() {
 * Future 需要由 Executor 执行；具体到 async-std 运行时，task module 负责运行 future
 * 异步代码等待时不能 block Executor
 
-### d. Under the Hood
+### d. Pin
+
+Pin 机制最重要的用途就是用来保证 Rust 异步机制的安全。
+
+本节深入介绍 **Pin** 的细节。
+
+#### i. 可移动
+
+进入本节之前，建议通过 [3. move](#3-move)  熟悉 move 的概念。
+
+通过一个例子详解 move 的细节：
+
+```rust
+#![allow(unused)]
+
+fn main() {
+    // s1 (变量) 是 String `hello` (值) 的 owner
+    // 底层的实现大概是：`hello` 被存放在分配在 heap 上的空间
+    // s1 是个肥指针：记录了「字符串长度」，「字符串存放空间地址」等信息
+    let s1 = String::from("hello");
+
+    // 进行 move：s1 记录的信息被 copy 给了 s2（「字符串长度」，「字符串存放空间地址」）
+    // 但字符串内容（`hello`）本身地址不会变动
+    // 移动以后可以使用 s2 完全没有问题
+    // 这是因为 String `hello` 本身的地址没有变化，可以通过 s2 被安全的继续使用
+    let s2 = s1;
+}
+```
+
+上面例子中的 s1 move 到 s2 具体动作如下图（从 TRPL 书摘录）所示：
+
+<img src="https://doc.rust-lang.org/stable/book/img/trpl04-02.svg" alt="move" width="300"/>
+
+就上面的例子来说，String 类型是一个「可移动」（movable）类型。
+
+> **可移动**（movable）：所谓一个类型「可移动」，是指一旦拿到这个类型的「值」的 ownership 或 &mut（独占指针），就可以安全的进行 move
+
+正常来说，Rust 中的所有类型都应该是「可移动」的。
+
+但有例外的场景，某些类型被移动后，会有问题。比如 **Self-Referential Structs**（自引用 structs）类型的 move 就可能有问题。
+
+类似下面这种 struct：一个字段指向另外一个字段
+
+```rust
+struct Test {
+    a: String,
+    b: *const String,
+}
+```
+
+具体问题参考：[Pinning in Detail](https://rust-lang.github.io/async-book/04_pinning/01_chapter.html#pinning-in-detail)，看了它里面的图就一目了然了：
+
+<img src="https://rust-lang.github.io/async-book/assets/swap_problem.jpg" alt="async" width="500"/>
+
+总之 **Self-Referential Structs** 可能会引起 move 后的指针无效的问题。该问题可能的解决方法有：
+
+* 每次 move 时，修改指针指向的地址；但这个方法运行时性能代价高
+* 指针不储存绝对地址，只储存偏移量；这样需要编译器针对 **Self-Referential Structs** 做专门的处理，编译器实现代价高
+* Rust 采用 **Pin** 机制来解决问题：开发者负责把不能被 move 的类型标记出来；从编译层面对这些被标记了的类型进行限制：使得没有办法对这些类型做 move 动作
+  * 运行时付出的性能代价为 0
+  * 代价就是开发者需要学习 Pin 的用法
+
+#### ii. Pin 的定义
+
+> **核心理念**：
+>
+> 要限制一个类型 T 不能被 move，也就是要对这个类型 T 的访问进行限制：只要不能拿到到这个类型 T 的 ownership 或者 &mut T（独占指针）就行了。
+>
+> 在 Pin 机制中，只要利用 Pin 把这个类型 T 包起来（或者说屏蔽起来）就能实现这个限制效果。
+
+Pin 的定义：
+
+```rust
+// 一个包了指针的 struct
+pub struct Pin<P> {
+    pointer: P,
+}
+```
+
+其中：
+
+* Pin **自己是一个指针**，Pin 本身实现了 Deref 和 DerefMut，
+* P **必须是一个指针**，也就是实现了 Deref 或 DerefMut 的类型。例如：Box\<T>
+
+怎么利用 Pin 把需要限制的类型 T 包起来（屏蔽起来）？
+
+* 因为 P 只能包一个指针，所以先要构建一个指向 T 的指针 P。可以构建 2 种指针：
+  * **&mut T**：「**可变引用**」实际上就是 T 的「独占指针」
+  * **Pin\<Box\<T>>**：使用智能指针 **Box**
+* 然后再用 Pin 把构建好的指针类型 P 包起来。既然有 2 种指针类型，那么也有 2 种 Pin：
+  * **Pin<&mut T>**：但这种方式坑多，使用起来需要很小心，**一般不推荐使用这种方法**
+  * **Pin\<Box\<T>>**：可以使用标准库 Box::pin 函数来构建。得到一个在 heap 上的 T 的值，然后这个值被 Pin 屏蔽住
+    * **推荐使用这种方法**
+
+#### iii. Unpin and !Unpin
+
+上一节已经说明了通过 Pin 机制，可以把「不可移动」的类型 T 封装到 Pin 中，从而限制去获取 T 的 ownership 或者 &mut T（独占指针），进而保证不会产生 move 问题。
+
+但实际上 Pin 是和 Unpin trait 组合在一起使用的，所以还需要详细介绍 Unpin（以及 !Unpin）的概念。
+
+配合 Unpin 使用 Pin 的**原则**如下：
+
+原则一：
+> **Unpin Types can be safely moved after being pinned**。
+>
+> 如果类型 T 是「可移动」类型，那么就对该类型 T 实现 Unpin trait。
+>
+> 一旦类型 T 实现了 Unpin trait，那么即使用 Pin 包住这个类型 T（例如 Pin<&mut T>），也不会有屏蔽效果，
+>
+> 还是可以从 Pin 中拿到 T 的 ownership 或者 &mut T（独占指针），并进行 move
+
+原则二：
+> **Guarantee that an object implementing !Unpin won't ever be moved**。
+>
+> 只有当 Pin 包住的类型 T（例如 Pin\<Box\<T>> 中的 T）实现了 !Unpin trait，才无法获取到 T 的 ownership 或者 &mut T（独占指针），从而没办法对类型 T 进行 move
+
+原则三：
+> 一个 struct 类型 T 只要有一个 field 是 !Unpin 的，这个 struct 类型 T 就是 !Unpin 的。
+
+而 Rust 中绝大多数正常类型，都是 movable 的。所以，Rust 中大多数类型都已经实现了 Unpin trait（[**auto trait**](https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits)）。
+
+比如 String 类型实现了 Unpin，可以 通过 Pin 机制，使用多种方从 Pin 中拿到 String 进行操作:
+
+```rust
+#![allow(unused)]
+
+fn main() {
+    let mut string = "Pinned?".to_string();
+
+    // 构建 Pin<&mut T>
+    let mut pinned: Pin<&mut String> = Pin::new(&mut string);
+    // String 实现了 Unpin，所以不受限制
+    // 可以直接从 Pin<&mut T> 拿到内部真正的 T String，进行操作
+    pinned.push_str(" Not");
+
+    // 也提供了 Pin::into_inner 方法来返回指针 P
+    // 调用 Pin::into_inner 也 move（并消耗掉）入参 pinned 的所有权
+    Pin::into_inner(pinned).push_str(" so much.");
+    let new_home = string;
+    assert_eq!(new_home, "Pinned? Not so much.");
+}
+```
+
+> 甚至 Pin 本身也自动实现了 Unpin：利用 Pin 来限制 T，T 的确实现了 !Unpin，但 Pin 本身并没有实现 !Unpin 的必要
+
+在 Rust 中，真正实现了 !Unpin trait 的只有 2 个类型（这里只先提一下，下一节会详细讲）：
+
+* Future 转换为状态机时，编译器生成 **Self-Referential Structs** 来保存状态机上下文数据，编译器会给这些 **Self-Referential Structs** 实现 !Unpin trait
+* 标准库中的 std::marker::PhantomPinned 类型也实现了 !Unpin trait
+
+#### iv. Future and Pin
+
+* Rust 里面，使用 Future 来描述一个状态机
+* 编译器把 async fn 或 async block 转换为状态机代码时，使用到了 **Self-Referential Structs**
+* 后续使用该 Future 的人如果不小心对这个 Future 进行了 move，就会出问题
+* 所以需要使用 Pin 机制来保证 Future 的安全（不会被 move）
+
+先简单举例说明怎么把异步代码（async fn 或 async block）转换为状态机（更多细节请参考：[The Async/Await Pattern](https://os.phil-opp.com/async-await/#the-async-await-pattern)）。
+
+这里举个 async block 的简单例子：
+
+```rust
+#![allow(unused)]
+
+fn main() {
+    async {
+        let mut x = [0; 128];
+        let read_into_buf_fut = read_into_buf(&mut x);
+        read_into_buf_fut.await;
+        println!("{:?}", x)
+    }
+}
+```
+
+编译器在对这个 async block 生成状态机时：
+
+* 构建一个有 3 个状态的状态机：StartState，WaitingOnReadState，EndState
+* 对每个状态，需要定义对应的 struct 来保存该状态的上下文信息：
+
+```rust
+// 整个 async block 被转换为一个 future： 
+struct AsyncFuture {
+    // future 中包括了 async block 内部使用到的数据：
+    x: [u8; 128],
+
+    // future 中也需要包含状态机工作时，每个状态的上下文信息（只有记录了每个状态的上下文信息，状态机才能被不断推进）
+    // 本例子中，我们只重点关心 WaitingOnReadState 状态的上下文
+    waiting_on_read_state: WaitingOnReadState,
+}
+
+// 定义一个 WaitingOnReadState 状态的上下文信息的 struct
+struct WaitingOnReadState<'a> {
+    // 指向了 AsyncFuture 的 `x` 字段，所以 AsyncFuture 是一个 Self-Referential Struct
+    buf: &'a mut [u8],
+}
+```
+
+可以看出，async block 的状态机的底层实现中，会把 Future 实现为 **Self-Referential Structs**（自引用 struct），只能利用 Pin 机制来防止使用 Future 的人对 Future 进行 move。
+
+### e. Under the Hood
 
 Future trait 真实定义如下：
 
@@ -2056,22 +2255,12 @@ fn main() {
 详解：
 
 * **Output** 是 Future 执行完成后返回的值的类型
-* **Pin 类型**的目的是使得所有的 Future 类型不能被 move，也就是有一个固定的地址，也就是说指向这个地址的指针永远都有效，也就是说可以创建一个 **Self-Referential Structs**（**自引用** struct），后面会详细说。例如：
-
-```rust
-struct MyFut {
-    v: String,
-    // ptr_to_v 是指向第一个字段 v 的指针
-    // 如果没有 Pin 住，一旦 MyFut 被移动，那么 v 的地址就变化了
-    // 但 ptr_to_v 的值没有变化，会造成 ptr_to_v 的值无效
-    ptr_to_v: *mut String
-}
-```
-
+* 开始调用 poll() 方法之前，必须先用一个 Pin 类型把 Future 包装起来才能调用 poll() 方法
+  * **用一个 Pin 类型把 Future 包装起来的目的是防止这个 Future 实例被 move**。原因下一小节详细说
 * 由第 3 方异步运行时库提供的 Executor 负责执行 Future：
   * 整个状态机由一个最外层 Future，和其它内部 Futures 一起组成
   * Executor 先做第一次 poll，启动状态机
-  * Executor 然后通过调用 poll 推进状态机，直到整个任务完成
+  * Executor 会继续调用 poll，推进状态机，直到整个任务完成
 
 但如果 Executor 通过循环重试的方式来不断 poll 效率太低。高效的方式是通过某种通知机制，当 Future 已经就绪时，才去做 poll。所以又引入了 Waker：
 
@@ -2155,7 +2344,8 @@ async fn main() {
 }
 
 struct MyFuture {
-    // 需要 Pin 和 Box 配合使用（后面会详细说）
+    // Sleep 是一个 Future，不能直接调用 poll()，
+    // 需要 Pin 和 Box 组合起来才能调用 poll（下面一个小节会详细说）
     sleep: Pin<Box<Sleep>>,
 }
 
@@ -2175,12 +2365,12 @@ impl Future for MyFuture {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         println!("MyFuture::poll()");
-        // 这个一个典型的惯用法：Future 的实现里面对另外一个 future 进行 poll
+        // 这个一个典型的惯用法：Future 的实现里面对另外一个 Future 进行 poll
         //
         // 因为异步版本的 sleep 内部实现了利用 waker 来通知 Executor
         // 所以可以直接对异步版本的 sleep 进行 poll
         //
-        // 异步版本的 sleep，需要 Pin 和 Box 配合使用
+        // 异步版本的 sleep 的 poll()，需要 Pin 和 Box 组合起来调用 poll()
         self.sleep.as_mut().poll(cx)
     }
 }
@@ -2210,138 +2400,6 @@ fn main() {
     }
 }
 ```
-
-### e. Pin
-
-最后再详细说一下 **Pin** 相关的细节。
-
-#### i. movable
-
-进入本节之前，建议到 [3. move](#3-move)  复习一下 move 的概念。
-
-通过一个例子详解 move 的细节：
-
-```rust
-#![allow(unused)]
-
-fn main() {
-    // s1 (变量) 是 String `hello` (值) 的 owner
-    // 底层的实现大概是：`hello` 被存放在分配在 heap 上的空间
-    // s1 是个肥指针：记录了字符串长度，字符串存放空间的地址等信息
-    let s1 = String::from("hello");
-
-    // 进行 move：s1 记录的所有数据被 copy 给了 s2（字符串程度，字符串存放空间的地址）
-    // 移动以后可以安全的使用 s2
-    // 这是因为 String `hello` 本身的地址没有变化，可以通过 s2 被安全的继续使用
-    let s2 = s1;
-}
-```
-
-就上面的例子来说，String 类型是一个 movable（可移动）的类型。
-
-> movable（可移动）：所谓一个类型 movable，是指一旦拿到这个类型的「值」的 ownership 或 &mut（独占指针），就可以安全的进行 move
-
-正常来说，Rust 中的所有类型都应该是「可移动」的。
-
-但有例外的场景，某些类型被移动后，会有问题。比如涉及到 **Self-Referential Structs**（自引用 structs），move 就可能有问题了。
-
-类似下面这种 struct：一个字段指向另外一个字段
-
-```rust
-struct Test {
-    a: String,
-    b: *const String,
-}
-```
-
-具体问题参考文档：[Pinning in Detail](https://rust-lang.github.io/async-book/04_pinning/01_chapter.html#pinning-in-detail)，看了它这个文档里面的图就一目了然了：
-
-![img](https://rust-lang.github.io/async-book/assets/swap_problem.jpg)
-
-所以 **Self-Referential Structs** 可能会引起 move 后的指针无效的问题。该问题可能的解决方法有：
-
-* 每次 move 时，修改指针指向的地址；但这个方法付出的运行时性能代价高
-* 指针不储存绝对地址，只储存偏移量；这样需要编译器针对 **Self-Referential Structs** 做专门的处理，编译器实现代价高
-* Rust 采用 **Pin** 机制来解决问题：开发者负责把不能被 move 的类型标记出来；从编译层面对这些被标记了的类型进行限制：使得没有办法对这些类型做 move 动作
-  * 运行时付出的性能代价为 0
-  * 代价就是开发者需要学习 Pin 的用法
-
-#### ii. Pin 的定义
-
-> 核心理念：
->
-> 要限制一个类型 T 不能被 move，也就是要对这个类型 T 的访问进行限制：只要不能拿到到这个类型 T 的 ownership 或者 &mut T（独占指针）就行了。
->
-> 在 Pin 机制中，只要利用 Pin 把这个类型 T 包起来（或者说屏蔽起来）就能实现这个限制效果。
-
-Pin 的定义：
-
-```rust
-// 一个包了指针的 struct
-pub struct Pin<P> {
-    pointer: P,
-}
-```
-
-* Pin **自己是一个指针**，Pin 本身实现了 Deref 和 DerefMut，
-* P **必须是一个指针**，也就是实现了 Deref 或 DerefMut 的类型。例如：Box\<T>
-
-那怎么用 Pin 把需要限制的类型 T 包起来（屏蔽起来）？
-
-* 因为 P 只能包一个指针，所以先要构建一个指向 T 的指针 P。可以构建 2 种指针：
-  * &mut T：「可变引用」实际上就是 T 的「独占指针」
-  * Pin\<Box\<T>>：使用智能指针 Box
-* 然后再用 Pin 把构建好的指针类型 P 包起来。既然有 2 种指针类型，那么也有 2 种 Pin：
-  * Pin<&mut T>：但这种方式坑多，使用起来需要很小心，**一般不推荐使用这种方法**
-  * Pin\<Box\<T>>：可以使用标准库 Box::pin 函数来构建。得到一个在 heap 上的 T 的值，然后这个值被 Pin 包起来
-    * **推荐使用这种方法**
-
-#### iii. Unpin and !Unpin
-
-上一节已经说明了使用 Pin 机制，可以把不能 movable 的类型封装到 Pin 中，从而限制去获取 T 的 ownership 或者 &mut T（独占指针），进而保证不会产生 move 问题。
-
-但还需要进一步说明一下 Pin 机制的具体**原则**（引入了 Unpin 和 !Unpin 的概念）。
-
-> Pin 的**原则**：
->
-> 如果 Pin 包住的类型 T （比如 Pin<&mut T> 中的 T）实现了 Unpin trait，那么可以直接从 Pin<&mut T> 中获取到 T 的 ownership 或者 &mut T（独占指针）
->
-> 只有当 Pin 包住的类型 T （例如 Pin\<Box\<T>> 中的 T）实现了 !Unpin trait，才会限制去获取 T 的 ownership 或者 &mut T（独占指针）
-
-而 Rust 中绝大多数正常类型，都是 movable 的。所以，Rust 中大多数类型都已经实现了 Unpin trait（[**auto trait**](https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits)）。
-
-比如 String 类型实现了 Unpin，可以 通过 Pin 机制，使用多种方从 Pin 中拿到 String 进行操作:
-
-```rust
-#![allow(unused)]
-
-fn main() {
-    let mut string = "Pinned?".to_string();
-
-    // 构建 Pin<&mut T>
-    let mut pinned: Pin<&mut String> = Pin::new(&mut string);
-    // String 实现了 Unpin，所以不受限制
-    // 可以直接从 Pin<&mut T> 拿到内部真正的 T String，进行操作
-    pinned.push_str(" Not");
-
-    // 也提供了 Pin::into_inner 方法来返回指针 P
-    // 调用 Pin::into_inner 也 move（并消耗掉）入参 pinned 的所有权
-    Pin::into_inner(pinned).push_str(" so much.");
-    let new_home = string;
-    assert_eq!(new_home, "Pinned? Not so much.");
-}
-```
-
-> 甚至 Pin 本身也自动实现了 Unpin：只是用想通过 Pin 来限制 T，T 确实要实现 !Unpin，但 Pin 没有实现 !Unpin 的必要
-
-在 Rust 中，真正实现了 !Unpin trait 的只有 2 个类型（这里只先提一下，下一节会详细讲）：
-
-* Future 转换为状态机时，编译器生成的 **Self-Referential Structs** 来保存状态机数据，编译器会给这些 **Self-Referential Structs** 会实现 !Unpin trait
-* 标准库中的 std::marker::PhantomPinned 类型
-
-#### iv. Future and Pin
-
-（待）
 
 ## 18. closure
 
