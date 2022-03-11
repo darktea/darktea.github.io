@@ -219,30 +219,65 @@ fn change(some_string: &mut String) {
 * &i32：一个指向 i32 的不变引用类型
 * &mut i32：一个指向 i32 的可变引用类型
 
-引用的例子：
-
-```rust
-#![allow(unused)]
-
-fn main() {
-
-    // s 是一个值
-    let mut s = String::from("hello");
-
-    let r1 = &s; // 创建到 s 的不可变引用，OK
-    let r2 = &s; // 创建多个到 s 的不可变引用，也 OK
-    let r3 = &mut s; // ERROR：再创建一个到 s 可变引用：不行了，因为已经创建了针对 s 的其他引用了
-}
-```
-
 引用两原则：
 
 * At any given time, you can have either (but not both of) one mutable reference or any number of immutable references
   * 在给定作用域中的给定值有且只有一个「可变引用」
   * if we have an immutable reference to something, we cannot also take a mutable reference
+  * 在给定作用域中的给定值已经存在引用，也不能对一个值的 owner 进行 move
 * References must always be valid
   * 值的生命周期必须比指向它的引用的生命周期大（outlives）
   * 如果被引用的变量失效了，这个引用也就失效了
+
+> **注意**
+>
+> 引用原则中的【作用域】指的是：从创建开始，一直持续到它**最后一次使用**的地方，而不是从创建持续到某一个花括号
+
+请仔细对比以下 2 个例子，一个【合法】，一个【非法】：
+
+【合法】：
+
+```rust
+#[allow(unused_assignments)]
+fn main() {
+    // 变量 s 对该 String 值有 ownership
+    let mut s = "12345".to_string();
+
+    // r 是到 s 的「可变引用」，或者可以说：“引用 r is a borrow of 变量 s”
+    let r = &mut s;
+
+    //【合法】：使用「可变引用」 r 对值进行修改
+    // 而且这里是 r 【最后一次】被使用的地方
+    r.push_str("67890");
+
+    //【合法】：因为这里已经不是引用 r 的作用范围（已经在最后一次使用之后了）
+    // 所以满足原则：“在给定作用域中的给定值已经存在引用，也不能对一个值的 owner 进行 move”
+    s = String::from("123456789012345");
+}
+```
+
+【非法】：
+
+```rust
+#[allow(unused_assignments)]
+fn main() {
+    // 变量 s 对该 String 值有 ownership
+    let mut s = "12345".to_string();
+
+    // r 是到 s 的「可变引用」，或者可以说：“引用 r is a borrow of 变量 s”
+    let r = &mut s;
+
+    //【合法】：使用「可变引用」 r 对值进行修改
+    r.push_str("67890");
+
+    //【非法】：因为这里还在引用 r 的作用范围之内（之后还使用了 r.len，不是【最后一次】被使用）
+    // 所以违反了原则：“在给定作用域中的给定值已经存在引用，也不能对一个值的 owner 进行 move”
+    s = String::from("123456789012345");
+
+    // r 还在被使用
+    r.len();
+}
+```
 
 ## 6. lifetime
 
@@ -1839,8 +1874,7 @@ fn main() {
     * 简单点说，就是用来描述一个状态机
   * Future 本身不执行代码，Future 只有配合 Executor 才能真正的把代码运行起来，推进状态机
 * Executor：用来真正的把 Future 执行起来（重点关注：when & how：计算什么时候执行，怎么执行）
-  * 当前 Rust 语言本身只定义 Future 等 traits，Executor 的实现由**异步运行时**库完成
-  * 也就是说由**异步运行时**库负责实现 Executor
+  * 当前 Rust 语言本身只定义 Future 等异步组件相关的 traits，Executor 的实现由**异步运行时**（async_std，tokio 等开源库）负责
 
 ### a. Future
 
@@ -1868,9 +1902,40 @@ When a future eventually returns Poll::Ready(T), we say that the future resolves
 
 > 翻译：当一个 Future 实例完成后，会返回 Poll::Ready(T)，这时我们可以说这个 Future 实例被 resolve 成一个类型 T 的返回值
 
+为了更容易理解，Future 还可以分为 2 类：
+
+* leaf Futures（底层 Future）：直接封装某种 IO 操作的异步调用（由 async_std，tokio 等开源库实现）。tokio 库的例子：
+
+```text
+// 异步的创建 socket 连接，并返回一个 **leaf-future**：stream
+let mut stream = tokio::net::TcpStream::connect("127.0.0.1:3000");
+```
+
+* non-leaf Futures（非底层 Future）：多个 Futures 组合起来描述一个异步任务，事实上是一个状态机（开发者进行开发）。例如：
+
+```rust
+#![allow(unused)]
+
+fn main() {
+// 创建了一个异步任务（事实上是一个有 4 个状态的状态机）
+// 其中用到了 async/.await（这里只是先举例，接下来会对它们详细介绍）
+// 最后成功的构建出一个 non-leaf Future
+    let non_leaf = async {
+// 状态 1：创建 socket 连接。这里使用了一个 leaf Future，并进行等待
+        let mut stream = TcpStream::connect("127.0.0.1:3000").await.unwrap();
+// 状态 2: socket 连接成功
+        println!("connected!");
+// 状态 3：异步写文件，并等待中
+        let result = stream.write(b"hello world\n").await;
+// 状态 4: 写完成
+        println!("message sent!");
+    };
+}
+```
+
 ### b. async/.await
 
-怎么创建一个 Future 来描述一个执行动作（状态机）？Rust 里面使用 async/.await 来创建一个 Future。
+怎么创建一个 non-leaf 类型的 Future 来描述异步任务（状态机）？Rust 提供了 async/.await 机制供开发者使用，可以利用它们构建一个描述异步任务的 Future。
 
 先分别给一下同步读文件和异步读文件的例子，对比一下看看。
 
@@ -1907,7 +1972,7 @@ fn main() {
 
         // File::open(path) 本身返回一个 Future
         // .await 是关键，使用了 .await 后，当真正执行到这里时，状态机进入等待状态
-        // 直到 open 成功后，能拿到 Ready(T) 中的 T：file。然后，状态机才会继续推进 
+        // 直到 open 成功后，能拿到 Ready(T) 中的 T：file。当前状态结束，状态机继续推进到下个状态 
         let mut file = File::open(path).await?;
         let mut contents = String::new();
         file.read_to_string(&mut contents).await?;
@@ -1916,49 +1981,15 @@ fn main() {
 }
 ```
 
-下面是 async/.await 语句的详解：
-
-* async 是在 2 个主要场景中被使用，在这 2 个场景中，都会返回一个 Future trait：
-  * async fn
-  * async blocks（返回这个代码块最后一个表达式的值的 future）
-* 一旦函数或 block 使用了 async 后，使用了 async 的代码就是描述了一个**状态机**
-* 调用 async 的函数体或者代码块，并不会被执行，而是立即返回一个 Future 给调用者
-* 想要真正的让 Future 执行，具体参考**异步运行时**库的说明，这里列举 2 个例子：
-  * 在 main 中直接使用 block_on 方法（类似同步模式来执行一个 Future，并等待其执行结束）
-  * 在一个 async 代码块中，使用 **.await** 来执行一个 Future，如果最后完成的话，返回 Future 的结果
-* 一旦执行 Future 的时候被阻塞（blocked），会 yield （让出）当前线程的控制，Executor 会调度其它的 Future 继续执行
-* 直到阻塞（blocked）结束，线程调度器（Executor）负责恢复并继续执行这个 Future
-
-再看一个简单例子：
-
-```rust
-
-// `foo()` returns a type that implements `Future<Output = u8>`.
-// `foo().await` will result in a value of type `u8`.
-async fn foo() -> u8 {
-    5
-}
-
-fn bar() -> impl Future<Output=u8> {
-    // This `async` block results in a type that implements `Future<Output = u8>`.
-    async {
-        // 在一个 async 内部，必须使用 .await 来真正执行 future
-        // 等这个 Future 执行成功后，会返回这个 Future 的值（u8 类型）
-        let x: u8 = foo().await;
-        x + 5
-    }
-}
-```
-
 > **NOTE**：如果 executor 有多个线程，那么 Future 恢复执行后有可能会到另外一个线程里去执行，需要注意线程安全（互斥和死锁）
 
 ----
 
-* **asynchronous function** 的惯用法：
-
-  * 开发者使用 async fn 来定义一个异步函数，异步函数返回一个 Future。然后需要由**异步运行时**库来真正执行这个 Future
-  * 在异步函数内部，需要使用「异步」版本的 IO 函数（由**异步运行时**库提供，例如：async_std 或 tokio）
-    * 「异步」版本的 IO 函数不会直接返回 IO 操作结果，而是会返回一个异步 IO Future
+* 通过 async/.await 机制创建异步任务（也就是 non-leaf 类型的 Futures）的惯用法：
+  * 开发者使用 async fn 来定义一个异步函数，异步函数返回一个 non-leaf 类型的 Future
+    * 然后需要由**异步运行时**库来真正执行这个 Future
+  * 在异步函数内部，需要使用「异步」版本的 IO 函数（由异步运行时提供）
+    * 「异步」版本的 IO 函数不会直接返回 IO 操作结果，而是会返回一个异步 IO Future（也就是 leaf Futures）
     * 再配合 .await 使用异步 IO Future，执行时等待异步 IO 成功后，会返回异步 IO 的结果
 
 ----
@@ -1984,56 +2015,7 @@ fn move_block() -> impl Future<Output=()> {
 }
 ```
 
-### c. 异步运行时
-
-运行异步代码目前由库来实现，例如：
-
-* async-std
-* tokio
-
-这里我们先用 async-std 来举例怎么运行一段异步代码（task::block_on）：
-
-```rust
-extern crate async_std;
-
-use async_std::{fs::File, io, prelude::*, task};
-
-async fn read_file(path: &str) -> io::Result<String> {
-    let mut file = File::open(path).await?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).await?;
-    Ok(contents)
-}
-
-fn main() {
-    // task::spawn 真正的启动异步代码的执行，并返回一个 JoinHandle
-    let reader_task = task::spawn(
-        // async block（需要用 async block 来调用 async 函数）返回一个新的 future
-        async {
-            let result = read_file("data.csv").await;
-            match result {
-                Ok(s) => println!("{}", s),
-                Err(e) => println!("Error reading file: {:?}", e)
-            }
-        });
-    println!("Started task!");
-    // block_on 方法，等待 JoinHandle 完成（JoinHandle 本身也是一个 future）
-    task::block_on(reader_task);
-    println!("Stopped task!");
-}
-```
-
-2 个步骤来运行异步代码：
-
-* 先用 task::spawn 启动一段异步代码的运行，返回一个新的 future（async_std::task::JoinHandle 类型）
-* 然后 task::block_on 来等待这个 JoinHandle  类型的 future 运行完成，最后从这个 future 拿到最后的运行结果
-
-总结：
-
-* Future 需要由 Executor 执行；具体到 async-std 运行时，task module 负责运行 future
-* 异步代码等待时不能 block Executor
-
-### d. Pin
+### c. Pin
 
 Pin 机制最重要的用途就是用来保证 Rust 异步机制的安全。
 
@@ -2041,9 +2023,9 @@ Pin 机制最重要的用途就是用来保证 Rust 异步机制的安全。
 
 #### i. 可移动
 
-进入本节之前，建议通过 [3. move](#3-move)  熟悉 move 的概念。
+进入本节之前，建议参考 [3. move](#3-move)  对 move 的概念进行回顾。
 
-通过一个例子详解 move 的细节：
+用一个例子再详解一下 move 的细节：
 
 ```rust
 #![allow(unused)]
@@ -2068,13 +2050,13 @@ fn main() {
 
 就上面的例子来说，String 类型是一个「可移动」（movable）类型。
 
-> **可移动**（movable）：所谓一个类型「可移动」，是指一旦拿到这个类型的「值」的 ownership 或 &mut（独占指针），就可以安全的进行 move
+> **可移动**（movable）：所谓一个类型「可移动」，是指一旦拿到这个类型的「值」的 ownership 或 &mut（独占指针），并进行 move 操作，而不会引起问题（不会发生**未定义行为**）
 
-正常来说，Rust 中的所有类型都应该是「可移动」的。
+正常来说，就像上面的 String 类型，Rust 中的所有类型都应该是「可移动」的。
 
-但有例外的场景，某些类型被移动后，会有问题。比如 **Self-Referential Structs**（自引用 structs）类型的 move 就可能有问题。
+但有例外的场景，某些类型被移动后，会有问题。比如对 **Self-Referential Structs**（自引用 structs）类型进行 move 就可能引起问题（发生**未定义行为**）。
 
-类似下面这种 struct：一个字段指向另外一个字段
+举个 **Self-Referential Structs** 的例子（一个字段指向另外一个字段）：
 
 ```rust
 struct Test {
@@ -2083,23 +2065,23 @@ struct Test {
 }
 ```
 
-具体问题参考：[Pinning in Detail](https://rust-lang.github.io/async-book/04_pinning/01_chapter.html#pinning-in-detail)，看了它里面的图就一目了然了：
+自引用 structs 的 move 问题的细节请参考：[Pinning in Detail](https://rust-lang.github.io/async-book/04_pinning/01_chapter.html#pinning-in-detail)，看了它里面的图就一目了然了：
 
 <img src="https://rust-lang.github.io/async-book/assets/swap_problem.jpg" alt="async" width="500"/>
 
-总之 **Self-Referential Structs** 可能会引起 move 后的指针无效的问题。该问题可能的解决方法有：
+总之 **Self-Referential Structs** 可能会引起 move 后的指针无效问题。该问题可能的解决方法有：
 
-* 每次 move 时，修改指针指向的地址；但这个方法运行时性能代价高
-* 指针不储存绝对地址，只储存偏移量；这样需要编译器针对 **Self-Referential Structs** 做专门的处理，编译器实现代价高
-* Rust 采用 **Pin** 机制来解决问题：开发者负责把不能被 move 的类型标记出来；从编译层面对这些被标记了的类型进行限制：使得没有办法对这些类型做 move 动作
-  * 运行时付出的性能代价为 0
+* 每次 move 时，修改指针指向的地址；但这个方法会影响运行时的性能，代价较高
+* 指针不储存绝对地址，只储存偏移量；这样需要编译器针对 **Self-Referential Structs** 做专门的处理，编译器的实现会比较复杂
+* Rust 采用 **Pin** 机制来解决问题：开发者负责把不能被 move 的类型标记出来；利用类型系统对这些被标记了的类型进行限制：使得没有办法对这些类型做 move 动作
+  * 运行时付出的代价为 0，不影响性能
   * 代价就是开发者需要学习 Pin 的用法
 
 #### ii. Pin 的定义
 
 > **核心理念**：
 >
-> 要限制一个类型 T 不能被 move，也就是要对这个类型 T 的访问进行限制：只要不能拿到到这个类型 T 的 ownership 或者 &mut T（独占指针）就行了。
+> 要限制一个类型 T 不能被 move，也就是要对这个类型 T 的访问进行限制：只要不能拿到到这个类型 T 的 ownership 或者 &mut T（独占指针），也就不能对这个类型 T 做 move 操作。
 >
 > 在 Pin 机制中，只要利用 Pin 把这个类型 T 包起来（或者说屏蔽起来）就能实现这个限制效果。
 
@@ -2121,40 +2103,41 @@ pub struct Pin<P> {
 
 * 因为 P 只能包一个指针，所以先要构建一个指向 T 的指针 P。可以构建 2 种指针：
   * **&mut T**：「**可变引用**」实际上就是 T 的「独占指针」
-  * **Pin\<Box\<T>>**：使用智能指针 **Box**
-* 然后再用 Pin 把构建好的指针类型 P 包起来。既然有 2 种指针类型，那么也有 2 种 Pin：
-  * **Pin<&mut T>**：但这种方式坑多，使用起来需要很小心，**一般不推荐使用这种方法**
-  * **Pin\<Box\<T>>**：可以使用标准库 Box::pin 函数来构建。得到一个在 heap 上的 T 的值，然后这个值被 Pin 屏蔽住
-    * **推荐使用这种方法**
+  * **Box\<T>**：使用智能指针 **Box**
+* 然后再用 Pin 把构建好的指针类型 P 包起来。既然有 2 种指针，那么也有 2 种 Pin：
+  * **Pin<&mut T>**：但这种坑多，使用起来需要很小心，**先不推荐使用这种方法**
+  * **Pin\<Box\<T>>**：可以使用标准库 Box::pin 函数来构建。得到一个在 heap 上的 T 的值，然后这个值被 Pin 屏蔽住，**推荐使用这种方法**
 
 #### iii. Unpin and !Unpin
 
-上一节已经说明了通过 Pin 机制，可以把「不可移动」的类型 T 封装到 Pin 中，从而限制去获取 T 的 ownership 或者 &mut T（独占指针），进而保证不会产生 move 问题。
+上一节已经说明了通过 Pin 机制，可以把「不可移动」的类型 T 封装到 Pin 中，这样就没有办法获取到 T 的 ownership 或者 &mut T（独占指针），进而保证不能对 T 进行 move。
 
 但实际上 Pin 是和 Unpin trait 组合在一起使用的，所以还需要详细介绍 Unpin（以及 !Unpin）的概念。
 
-配合 Unpin 使用 Pin 的**原则**如下：
+> Unpin trait 是一种 [**auto trait**](https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits)。简单点说，Rust 中的各种类型，要么实现了 Unpin，要么实现了 !Unpin（事实上，Rust 中大多数类型都已经默认实现了 Unpin trait）。
+
+配合 Unpin 和 !Unpin，Pin 的使用**原则**如下：
 
 原则一：
 > **Unpin Types can be safely moved after being pinned**。
 >
-> 如果类型 T 是「可移动」类型，那么就对该类型 T 实现 Unpin trait。
+> 如果类型 T 是「可移动」类型，那么需要给该类型 T 实现 Unpin trait。
 >
-> 一旦类型 T 实现了 Unpin trait，那么即使用 Pin 包住这个类型 T（例如 Pin<&mut T>），也不会有屏蔽效果，
+> 一旦类型 T 实现了 Unpin trait，那么即使用 Pin 包住这个类型 T（例如 Pin<&mut T>），也不会对 T 有屏蔽效果。
 >
-> 还是可以从 Pin 中拿到 T 的 ownership 或者 &mut T（独占指针），并进行 move
+> 还是可以从 Pin 中拿到 T 的 ownership 或者 &mut T（独占指针），并进行 move。
 
 原则二：
 > **Guarantee that an object implementing !Unpin won't ever be moved**。
 >
-> 只有当 Pin 包住的类型 T（例如 Pin\<Box\<T>> 中的 T）实现了 !Unpin trait，才无法获取到 T 的 ownership 或者 &mut T（独占指针），从而没办法对类型 T 进行 move
+> 只有当 Pin 包住的类型 T（例如 Pin\<Box\<T>> 中的 T）实现了 !Unpin trait，才无法获取到 T 的 ownership 或者 &mut T（独占指针），从而达到了对 T 的屏蔽效果，没办法对类型 T 进行 move。
 
 原则三：
 > 一个 struct 类型 T 只要有一个 field 是 !Unpin 的，这个 struct 类型 T 就是 !Unpin 的。
 
-而 Rust 中绝大多数正常类型，都是 movable 的。所以，Rust 中大多数类型都已经实现了 Unpin trait（[**auto trait**](https://doc.rust-lang.org/reference/special-types-and-traits.html#auto-traits)）。
+而 Rust 中绝大多数正常类型，都是「可移动」的，默认都已经实现了 Unpin。
 
-比如 String 类型实现了 Unpin，可以 通过 Pin 机制，使用多种方从 Pin 中拿到 String 进行操作:
+比如 String 类型，也已经默认实现了 Unpin。按照上面的「原则一」，即使被 Pin 包住，也不会并屏蔽，可以使用多种方法从 Pin 中拿到 String 进行操作:
 
 ```rust
 #![allow(unused)]
@@ -2164,19 +2147,25 @@ fn main() {
 
     // 构建 Pin<&mut T>
     let mut pinned: Pin<&mut String> = Pin::new(&mut string);
-    // String 实现了 Unpin，所以不受限制
+    // String 实现了 Unpin，所以不会被 Pin 屏蔽
     // 可以直接从 Pin<&mut T> 拿到内部真正的 T String，进行操作
     pinned.push_str(" Not");
 
-    // 也提供了 Pin::into_inner 方法来返回指针 P
-    // 调用 Pin::into_inner 也 move（并消耗掉）入参 pinned 的所有权
+    // 也提供了 Pin::into_inner 方法来返回指针 P（相当于可以把外层包的 Pin 去掉）
     Pin::into_inner(pinned).push_str(" so much.");
     let new_home = string;
     assert_eq!(new_home, "Pinned? Not so much.");
 }
 ```
 
-> 甚至 Pin 本身也自动实现了 Unpin：利用 Pin 来限制 T，T 的确实现了 !Unpin，但 Pin 本身并没有实现 !Unpin 的必要
+**特别注意：**
+
+* Box\<T> 也是「可移动」的，也实现了 Unpin
+  * Box\<T> 是一个 heap 上的指针，所以可以安全的移动
+  * 但 T 可能「不可移动」，可能实现了 !Unpin
+* Pin\<Box\<T>> 也是「可移动」的，也实现了 Unpin
+  * Pin 的 field 是 Unpin 的 Box\<T>，所以 Pin 也是 Unpin 的
+  * 但 T 可能「不可移动」，可能实现了 !Unpin
 
 在 Rust 中，真正实现了 !Unpin trait 的只有 2 个类型（这里只先提一下，下一节会详细讲）：
 
@@ -2207,7 +2196,7 @@ fn main() {
 }
 ```
 
-编译器在对这个 async block 生成状态机时：
+编译器在对这个 async block 生成状态机：
 
 * 构建一个有 3 个状态的状态机：StartState，WaitingOnReadState，EndState
 * 对每个状态，需要定义对应的 struct 来保存该状态的上下文信息：
@@ -2232,7 +2221,7 @@ struct WaitingOnReadState<'a> {
 
 可以看出，async block 的状态机的底层实现中，会把 Future 实现为 **Self-Referential Structs**（自引用 struct），只能利用 Pin 机制来防止使用 Future 的人对 Future 进行 move。
 
-### e. Under the Hood
+### d. 更多底层细节
 
 Future trait 真实定义如下：
 
@@ -2256,7 +2245,7 @@ fn main() {
 
 * **Output** 是 Future 执行完成后返回的值的类型
 * 开始调用 poll() 方法之前，必须先用一个 Pin 类型把 Future 包装起来才能调用 poll() 方法
-  * **用一个 Pin 类型把 Future 包装起来的目的是防止这个 Future 实例被 move**。原因下一小节详细说
+  * **用一个 Pin 类型把 Future 包装起来的目的是防止这个 Future 实例被 move**
 * 由第 3 方异步运行时库提供的 Executor 负责执行 Future：
   * 整个状态机由一个最外层 Future，和其它内部 Futures 一起组成
   * Executor 先做第一次 poll，启动状态机
@@ -2264,9 +2253,9 @@ fn main() {
 
 但如果 Executor 通过循环重试的方式来不断 poll 效率太低。高效的方式是通过某种通知机制，当 Future 已经就绪时，才去做 poll。所以又引入了 Waker：
 
-* 当 Executor 调用 poll 的时候需要提供一个 **Context** 参数
+* 当 Executor 调用 poll 的时候需要提供一个 **Context** 参数，这个 Context 参数就包含了 Waker
 
-* 未来当 Future 完成时，可以通过 waker = cx.waker() 配合调用 waker.wake() 来通知 Executor 执行 poll
+* 未来当 Future 完成时，可以获取到 Waker（waker = cx.waker()），然后调用 waker.wake() 来通知 Executor 执行 poll
 
 * 具体 waker.wake() 要怎么通知，由 Executor 实现：
   * 一种可能的实现，就是调用 wake() 把就绪的任务加到**就绪队列**，Executor 消费**就绪队列**中已完成任务，进行 poll
