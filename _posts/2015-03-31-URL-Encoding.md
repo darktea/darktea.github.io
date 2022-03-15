@@ -11,11 +11,14 @@ category: notes
 在不知道是哪种编码时（可能是 GBK，也可能是 UTF-8），要都能成功解出中文
 
 例如对于
-```
+
+```text
 %C1%B9%D0%AC%C5%AE
 ```
+
 和
-```
+
+```text
 %E5%87%89%E9%9E%8B%E5%A5%B3
 ```
 
@@ -35,21 +38,21 @@ category: notes
 
 URL 一般由几个部分组成。例如：
 
-```
+```text
 https://bob:bobby@www.lunatech.com:8080/file;p=1?q=2#third
 ```
 
-|Part|Data|
-| ------------- | ------------- |
-|Scheme|https|
-|User|bob|
-|Password|bobby|
-|Host address|www.lunatech.com|
-|Port|8080|
-|Path|/file|
-|Path parameters|p=1|
-|Query parameters|q=2|
-|Fragment|third|
+| Part             | Data             |
+|------------------|------------------|
+| Scheme           | https            |
+| User             | bob              |
+| Password         | bobby            |
+| Host address     | www.lunatech.com |
+| Port             | 8080             |
+| Path             | /file            |
+| Path parameters  | p=1              |
+| Query parameters | q=2              |
+| Fragment         | third            |
 
 ## 2. URL 的保留字
 
@@ -62,16 +65,15 @@ https://bob:bobby@www.lunatech.com:8080/file;p=1?q=2#third
 * "=" 对 Path 部分不需要转义; 对 Query 的 值的部分不需要转义
 * 对 Path 部分不需要转义：
 
-```
+```text
 :@-._~!$&'()*+,;=
 ```
 
 * 对 Fragment 部分不需要转义：
 
-```
+```text
 /?:@-._~!$&'()*+,;=
 ```
-
 
 ## 3. URL 保留字编码
 
@@ -111,9 +113,7 @@ blue+light blue
 * GBK编码：C1B9  D0AC C5AE （每个字2个Bytes，一共6个Bytes）
 * UTF编码： E58789 E99E8B E5A5B3 （每个字3个Bytes，一共9个Bytes）
 
-编码工具：
-
-* http://r12a.github.io/apps/conversion/
+这里可以使用：[编码工具](http://r12a.github.io/apps/conversion/)。
 
 所以其 URL 编码分别为（每Byte前加一个百分号）：
 
@@ -126,8 +126,8 @@ blue+light blue
 
 * ASCII： 7bits 表示一个字符，共128字符
 * ASCII的增强：
- * 8bits表示一个字符，共256字符。例如： ISO­8859­1 （西欧字符）
- * 2Bytes表示一个字符，GBK。（其特点后面详细讲）
+  * 8bits表示一个字符，共256字符。例如： ISO­8859­1 （西欧字符）
+  * 2Bytes表示一个字符，GBK。（其特点后面详细讲）
 * Unicode字符集：对全世界的每个字符，规定一个唯一的数字（其范围目前是U+0000~U+10FFFF，大概100万，32bits可以搞定 ）来代表。例如：\u5973 女
 * 其他很多扩展字符集。。。
 
@@ -155,15 +155,15 @@ Unicode 字符集目前的范围是 U+0000~U+10FFFF。对 Unicode 字符集有�
 
 String使用 UTF-16（2字节或者4字节）：
 
-```
+```text
 String chinese="ab中文”
 String b= new String(bs,“GBK"); // bs is a byte array
 ```
 
 Refer:
 
-* http://www.zhihu.com/question/27562173
-* http://lukejin.iteye.com/blog/586088
+* [1](http://www.zhihu.com/question/27562173)
+* [2](http://lukejin.iteye.com/blog/586088)
 
 # 四, 问题解决方案
 
@@ -176,10 +176,10 @@ String b= new String(bs,“GBK");
 ```
 
 * 利用 nio 对 a 和 b 进行检测，判断是否是中文（没有乱码）：
- * java.nio.charset.Charset.forName("GBK").newEncoder().canEncode(a));
+  * java.nio.charset.Charset.forName("GBK").newEncoder().canEncode(a));
 * 如果都返回 true（看起来都不是乱码）。用正则判断是否是 UTF-8，否则就是 GBK
- * 例外 case（正则判断是 UTF-8，但实际上还是 GBK）： "鏈條", "瑷媄", "妤媞", "浜叉鼎"
+  * 例外 case（正则判断是 UTF-8，但实际上还是 GBK）： "鏈條", "瑷媄", "妤媞", "浜叉鼎"
 
-# 五, References:
+# 五, References
 
 * [What every web developer must know about URL encoding](http://www.oschina.net/translate/what-every-web-developer-must-know-about-url-encoding)
