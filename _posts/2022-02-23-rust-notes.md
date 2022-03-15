@@ -1876,7 +1876,7 @@ fn main() {
 * Executor：用来真正的把 Future 执行起来（重点关注：when & how：计算什么时候执行，怎么执行）
   * 当前 Rust 语言本身只定义 Future 等异步组件相关的 traits，Executor 的实现由**异步运行时**（async_std，tokio 等开源库）负责
 
-### a. Future
+### 17.1. Future
 
 Rust 中，Future 是一个 trait，其定义大致（简化版）如下：
 
@@ -1933,7 +1933,7 @@ fn main() {
 }
 ```
 
-### b. async/.await
+### 17.2. async/.await
 
 怎么创建一个 non-leaf 类型的 Future 来描述异步任务（状态机）？Rust 提供了 async/.await 机制供开发者使用，可以利用它们构建一个描述异步任务的 Future。
 
@@ -2015,13 +2015,13 @@ fn move_block() -> impl Future<Output=()> {
 }
 ```
 
-### c. Pin
+### 17.3. Pin
 
 Pin 机制最重要的用途就是用来保证 Rust 异步机制的安全。
 
 本节深入介绍 **Pin** 的细节。
 
-#### i. 可移动
+#### 17.3.1. 可移动
 
 进入本节之前，建议参考 [3. move](#3-move)  对 move 的概念进行回顾。
 
@@ -2077,7 +2077,7 @@ struct Test {
   * 运行时付出的代价为 0，不影响性能
   * 代价就是开发者需要学习 Pin 的用法
 
-#### ii. Pin 的定义
+#### 17.3.2. Pin 的定义
 
 > **核心理念**：
 >
@@ -2108,7 +2108,7 @@ pub struct Pin<P> {
   * **Pin<&mut T>**：但这种坑多，使用起来需要很小心，**先不推荐使用这种方法**
   * **Pin\<Box\<T>>**：可以使用标准库 Box::pin 函数来构建。得到一个在 heap 上的 T 的值，然后这个值被 Pin 屏蔽住，**推荐使用这种方法**
 
-#### iii. Unpin and !Unpin
+#### 17.3.3. Unpin and !Unpin
 
 上一节已经说明了通过 Pin 机制，可以把「不可移动」的类型 T 封装到 Pin 中，这样就没有办法获取到 T 的 ownership 或者 &mut T（独占指针），进而保证不能对 T 进行 move。
 
@@ -2172,7 +2172,7 @@ fn main() {
 * Future 转换为状态机时，编译器生成 **Self-Referential Structs** 来保存状态机上下文数据，编译器会给这些 **Self-Referential Structs** 实现 !Unpin trait
 * 标准库中的 std::marker::PhantomPinned 类型也实现了 !Unpin trait
 
-#### iv. Future and Pin
+#### 17.3.4. Future and Pin
 
 * Rust 里面，使用 Future 来描述一个状态机
 * 编译器把 async fn 或 async block 转换为状态机代码时，使用到了 **Self-Referential Structs**
@@ -2221,7 +2221,7 @@ struct WaitingOnReadState<'a> {
 
 可以看出，async block 的状态机的底层实现中，会把 Future 实现为 **Self-Referential Structs**（自引用 struct），只能利用 Pin 机制来防止使用 Future 的人对 Future 进行 move。
 
-### d. 更多底层细节
+### 17.4. 更多底层细节
 
 Future trait 真实定义如下：
 
