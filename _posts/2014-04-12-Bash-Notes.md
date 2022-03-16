@@ -125,6 +125,6 @@ echo $foo            # 单引号, prints Hello, $world!
 echo $bar            # 双引号, prints Hello, Earth!
 ```
 
-# References:
+# References
 
 * [Shell programming with bash: by example, by counter-example](http://matt.might.net/articles/bash-by-example/)
