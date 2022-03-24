@@ -1,9 +1,9 @@
 ---
-layout: post
 title: 系统性能监控之 Swap Space
-category: notes
+date: 2012-09-23 00:00:00 +0800
+categories: [notes]
+tags: [swap]
 ---
-
 
 对线上服务器进行性能监控时, 需要关注各种性能指标, 从各个方面来对系统性能进行监控. 例如, 系统负载, cpu 占用, 内存占用, 网络带宽等. 其中 Swap Space 的使用状况也是值得关注的一项, 本文对在 Linux 环境中监控 Swap Space 的相关内容进行了总结.
 

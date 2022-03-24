@@ -1,33 +1,9 @@
 ---
-layout: post
 title: Rust Notes
-category: notes
+date: 2022-02-23 00:00:00 +0800
+categories: [notes]
+tags: [rust]
 ---
-
-# Rust Notes
-
-## 目录
-
-[1. type](#1-type)  
-[2. ownership](#2-ownership)  
-[3. move](#3-move)  
-[4. borrowing](#4-borrowing)  
-[5. references](#5-references)  
-[6. lifetime](#6-lifetime)  
-[7. pointers](#7-pointers)  
-[8. collections](#8-collections)  
-[9. struct](#9-struct)  
-[10. enum](#10-enum)  
-[11. match](#11-match)  
-[12. module](#12-module)  
-[13. error](#13-error)  
-[14. traits](#14-traits)  
-[15. input / output](#15-input--output)  
-[16. threads](#16-threads)  
-[17. async](#17-async)  
-[18. closure](#18-closure)  
-[19. iterator](#19-iterator)  
-[20. macros](#20-macros)
 
 ## 1. type
 

@@ -1,7 +1,8 @@
 ---
-layout: post
 title: Bash Notes
-category: notes
+date: 2014-04-12 00:00:00 +0800
+categories: [notes]
+tags: [bash]
 ---
 
 # 1. 变量

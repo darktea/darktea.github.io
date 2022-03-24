@@ -1,7 +1,8 @@
 ---
-layout: post
 title: Java 异常实践总结
-category: notes
+date: 2014-02-08 00:00:00 +0800
+categories: [notes]
+tags: [java]
 ---
 
 本文对异常处理的种类进归纳, 试图总结出一种好的异常处理的实践方法

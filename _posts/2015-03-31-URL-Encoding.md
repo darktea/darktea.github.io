@@ -1,7 +1,8 @@
 ---
-layout: post
 title: URL Encoding
-category: notes
+date: 2015-03-31 00:00:00 +0800
+categories: [notes]
+tags: [字符编码]
 ---
 
 # 一, 要解决的问题

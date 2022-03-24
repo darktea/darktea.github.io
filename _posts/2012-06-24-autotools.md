@@ -1,7 +1,8 @@
 ---
-layout: post
 title: Autotools 使用入门
-category: notes
+date: 2012-06-24 00:00:00 +0800
+categories: [notes]
+tags: [autotools]
 ---
 
 # Autotools 使用入门

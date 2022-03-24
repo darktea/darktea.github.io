@@ -8,4 +8,3 @@ tags: [notes]     # TAG names should always be lowercase
 Just a Note.
 
 Please flow this guild: <https://chirpy.cotes.page/posts/getting-started>.
-

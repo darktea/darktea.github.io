@@ -1,7 +1,8 @@
 ---
-layout: post
 title: Linux Page Cache and Buffer Cache
-category: notes
+date: 2013-06-02 00:00:00 +0800
+categories: [notes]
+tags: [linux]
 ---
 
 # 〇, 目的

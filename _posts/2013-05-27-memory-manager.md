@@ -1,7 +1,8 @@
 ---
-layout: post
 title: Linux 内存管理
-category: notes
+date: 2013-05-27 00:00:00 +0800
+categories: [notes]
+tags: [linux]
 ---
 
 # 内存管理

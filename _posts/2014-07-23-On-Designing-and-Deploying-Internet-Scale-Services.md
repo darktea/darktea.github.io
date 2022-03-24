@@ -1,11 +1,13 @@
 ---
-layout: post
 title: On Designing and Deploying Internet-Scale Services
-category: notes
+date: 2014-07-23 00:00:00 +0800
+categories: [notes]
+tags: [分布式]
 ---
 
-<On Designing and Deploying Internet-Scale Services>
-    -- James Hamilton – Windows Live Services Platform
+“On Designing and Deploying Internet-Scale Services”
+
+-- James Hamilton – Windows Live Services Platform
 
 # 0. 目的
 

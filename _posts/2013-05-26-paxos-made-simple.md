@@ -1,8 +1,11 @@
 ---
-layout: post
-title: Basic Paxos (Paxos Made Simple 论文 Notes)
-category: notes
+title: Basic Paxos
+date: 2013-05-26 00:00:00 +0800
+categories: [notes]
+tags: [paxos]
 ---
+
+Paxos Made Simple 论文 Notes。
 
 # 一, Paxos 算法是用来解决什么问题的?
 

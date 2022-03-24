@@ -1,7 +1,8 @@
 ---
-layout: post
 title: Redis PSYNC
-category: notes
+date: 2013-03-14 00:00:00 +0800
+categories: [notes]
+tags: [redis]
 ---
 
 本文主要介绍 Redis 2.8 新引入的增量同步 PSYNC 机制.
