@@ -18,6 +18,21 @@ tags: [rust]
   * const 是编译期可决定的值（或表达式）
   * 可以在函数之外定义一个 const，在 module 的范围内使用这个 const
   * const 更快
+* type 关键字：给某个类型声明一个新的名字。例如：
+
+```rust
+#![allow(unused)]
+
+type Bytes = Vec<u8>;
+
+fn decode(data: &Bytes) {
+    //...
+}
+
+// 给每个 module 定义一个 Result 的 alias
+// 一般来说，某个 module 内，使用同一个 Error，使用这种 alias 就可以简化 Result 的书写
+pub type Result<T> = result::Result<T, Error>;
+```
 
 ## 2. ownership
 
@@ -1559,7 +1574,7 @@ impl HashMap<K, V> where K: Eq + Hash
         where K: Borrow<Q>,
               Q: Eq + Hash
     {
-        // ... 
+        // ...
     }
 }
 ```
@@ -1751,7 +1766,7 @@ fn main() {
 
     // 创建 2 个工作子线程负责处理任务：
     // orders_rx 从 orders 里面接受任务，处理完成后再使用 lunches_tx 发送给  lunches
-    // orders_rx2 从 orders 里面接受任务，处理完成后再使用 lunches_tx2 发送给  lunches  
+    // orders_rx2 从 orders 里面接受任务，处理完成后再使用 lunches_tx2 发送给  lunches
     let alice_handle = thread::spawn(|| cafeteria_worker("alice", orders_rx2, lunches_tx2));
     let zack_handle = thread::spawn(|| cafeteria_worker("zack", orders_rx, lunches_tx));
 
@@ -1807,7 +1822,7 @@ fn main() {
     // 主线程会立即进行 move，使用这个值，然后引用计数减一
     // 但此时引用计数还没有被减到 0，所以这个值在主线程执行之后不会被销毁
     println!("{:?}", foo);
-} 
+}
 ```
 
 * 默认场景 Arc\<T> 不能是可变的（mut）。如果需要可变，可以配合 Mutex 使用
@@ -1954,7 +1969,7 @@ fn main() {
 
         // File::open(path) 本身返回一个 Future
         // .await 是关键，使用了 .await 后，当真正执行到这里时，状态机进入等待状态
-        // 直到 open 成功后，能拿到 Ready(T) 中的 T：file。当前状态结束，状态机继续推进到下个状态 
+        // 直到 open 成功后，能拿到 Ready(T) 中的 T：file。当前状态结束，状态机继续推进到下个状态
         let mut file = File::open(path).await?;
         let mut contents = String::new();
         file.read_to_string(&mut contents).await?;
@@ -2184,7 +2199,7 @@ fn main() {
 * 对每个状态，需要定义对应的 struct 来保存该状态的上下文信息：
 
 ```rust
-// 整个 async block 被转换为一个 future： 
+// 整个 async block 被转换为一个 future：
 struct AsyncFuture {
     // future 中包括了 async block 内部使用到的数据：
     x: [u8; 128],
@@ -2246,7 +2261,7 @@ async fn main() {
 
 #### 17.4.3. Mutex
 
-「异步任务」间数据同步的安全保证，可使用「互斥」。Mutext 的用法可参考之前的小节（Arc）。
+「异步任务」间数据同步的安全保证，可使用「互斥」。Mutex 的用法可参考之前的小节（Arc）。
 
 ### 17.5. 更多底层细节
 
