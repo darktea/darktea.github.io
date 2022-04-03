@@ -41,8 +41,8 @@ pub type Result<T> = result::Result<T, Error>;
 所有权（ownership）3 原则：
 
 1. Rust 中每一个值都有一个称之为其「所有者」（owner）的「变量」
-2. 「值」有且只能有一个所有者（「变量」）
-3. 当所有者（「变量」）离开作用域，这个「值」将被丢弃，同时其资源也被释放
+1. 「值」有且只能有一个所有者（「变量」）
+1. 当所有者（「变量」）离开作用域，这个「值」将被丢弃，同时其资源也被释放
 
 > **思考**：使用 C 语言的时候，如果遵循这 3 个原则来使用指针？
 
@@ -219,10 +219,10 @@ fn change(some_string: &mut String) {
 * At any given time, you can have either (but not both of) one mutable reference or any number of immutable references
   * 在给定作用域中的给定值有且只有一个「可变引用」
   * if we have an immutable reference to something, we cannot also take a mutable reference
-  * 在给定作用域中的给定值已经存在引用，也不能对一个值的 owner 进行 move
 * References must always be valid
   * 值的生命周期必须比指向它的引用的生命周期大（outlives）
-  * 如果被引用的变量失效了，这个引用也就失效了
+  * 如果被引用的值失效了（被 drop 掉），这个引用也就失效了
+    * **在给定作用域中的给定值已经存在引用，也不能对一个值的 owner 进行 move**：因为一旦对这个值的 owner 进行 move 操作，这个值就会被 drop 掉，就导致这个值上的引用失效
 
 > **注意**
 >
@@ -273,6 +273,10 @@ fn main() {
     r.len();
 }
 ```
+
+> 总之：
+>
+> owner 和 可变引用的根本区别就在于 owner 会负责值的 drop（释放）；这个区别也就决定了一旦值上存在引用，就要小心的使用 owner，要保证这个值要始终有效，不要被释放，否则 Rust 的编译器会提示失败。
 
 ## 6. lifetime
 
@@ -451,7 +455,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 遍历 vector，并修改其中的值：
 
@@ -464,7 +468,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 如果一个 vector 中需要存不同类型的值，可以利用 Enum 类型来实现：
 
@@ -491,7 +495,7 @@ fn main() {
 * Rust 中使用 std::collections::HashMap 来表示 1 对 1 的关系。
 * Rust 的 Map，所有的 key 必须为相同的类型。所有的 value 必须为相同的类型。
 
-----
+---
 
 创建一个 map 来记录 2 个队伍的分数：
 
@@ -518,7 +522,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 Hash Map 会对其中的值有 ownership。下面的例子中，在执行了 map.insert 以后，field_name 和 field_value 失去对原先值的 ownership：
 
@@ -534,7 +538,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 拿到 HaspMap 中的值：
 
@@ -549,7 +553,7 @@ fn main() {
 
 这里的 score 是一个 Some(&10)，也就是说，是一个 Option<&V>；如果值不存在，返回 None。
 
-----
+---
 
 遍历 HashMap：
 
@@ -561,7 +565,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 利用 entry 方法和 or_insert 来实现只有当 key 不存在时才 insert 新值：
 
@@ -579,7 +583,7 @@ String 特性
 * growable
 * mutable
 
-----
+---
 
 新建 String
 
@@ -607,7 +611,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 * 用 + 号连结
 
@@ -709,7 +713,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 其他一些关于 &str 的要点：
 
@@ -998,7 +1002,7 @@ enum Result<T, E> {
 
 > 用 enum 的潜台词就是函数返回时，要么返回一个正常的结果，要么遇到一个可恢复异常。
 
-----
+---
 
 分别对正常结果，和异常处理的例子：
 
@@ -1016,7 +1020,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 异常类型忽略的写法：
 
@@ -1033,7 +1037,7 @@ fn remove_file(path: &Path) -> Result<()> {}
 pub type Result<T> = result::Result<T, io::Error>;
 ```
 
-----
+---
 
 Result 配合 unwrap 的使用：
 
@@ -1059,7 +1063,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 一个把异常传递到调用者的例子：
 
@@ -1297,7 +1301,7 @@ fn top_ten<T: Debug + Hash + Eq>(values: &Vec<T>) {}
   * Generic Type Parameter：
     * 泛型类型参数的运行效率更高（泛型是在编译时展开，所以运行时无额外的代价）
 
-----
+---
 
 其他一些 trait 相关的注意事项：
 
@@ -1980,7 +1984,7 @@ fn main() {
 
 > **NOTE**：如果 executor 有多个线程，那么 Future 恢复执行后有可能会到另外一个线程里去执行，需要注意线程安全（互斥和死锁）
 
-----
+---
 
 * 通过 async/.await 机制创建异步任务（也就是 non-leaf 类型的 Futures）的惯用法：
   * 开发者使用 async fn 来定义一个异步函数，异步函数返回一个 non-leaf 类型的 Future
@@ -1989,13 +1993,13 @@ fn main() {
     * 「异步」版本的 IO 函数不会直接返回 IO 操作结果，而是会返回一个异步 IO Future（也就是 leaf Futures）
     * 再配合 .await 使用异步 IO Future，执行时等待异步 IO 成功后，会返回异步 IO 的结果
 
-----
+---
 
 * 生命周期
   * async fn 的入参如果是  non-'static 参数（非 static 生命周期的参数），那么这个 async fn 返回的 Future 的生命周期需要被限制在函数入参的生命周期之内
     * 换句话说，当在这个 Future 上做 .await 的时候，当初调用这个 async fn 时的入参的生命周期必须仍然有效
 
-----
+---
 
 * async move 代码块：
 
@@ -2116,7 +2120,9 @@ pub struct Pin<P> {
 配合 Unpin 和 !Unpin，Pin 的使用**原则**如下：
 
 原则一：
-> **Unpin Types can be safely moved after being pinned**。
+
+>
+> Unpin Types can be safely moved after being pinned。
 >
 > 如果类型 T 是「可移动」类型，那么需要给该类型 T 实现 Unpin trait。
 >
@@ -2125,6 +2131,8 @@ pub struct Pin<P> {
 > 还是可以从 Pin 中拿到 T 的 ownership 或者 &mut T（独占指针），并进行 move。
 
 原则二：
+
+>
 > **Guarantee that an object implementing !Unpin won't ever be moved**。
 >
 > 只有当 Pin 包住的类型 T（例如 Pin\<Box\<T>> 中的 T）实现了 !Unpin trait，才无法获取到 T 的 ownership 或者 &mut T（独占指针），从而达到了对 T 的屏蔽效果，没办法对类型 T 进行 move。
@@ -2155,7 +2163,7 @@ fn main() {
 }
 ```
 
-**特别注意：**
+特别注意：
 
 * Box\<T> 也是「可移动」的，也实现了 Unpin
   * Box\<T> 是一个 heap 上的指针，所以可以安全的移动
@@ -2497,7 +2505,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 用一些更复杂的例子说明更多的细节：
 
@@ -2517,7 +2525,7 @@ fn sort_cities(cities: &mut Vec<City>) {
 * 有点像其他语言（Java）中的匿名函数
 * 但 Rust 的 closure 和其他语言的匿名函数又有区别
 
-----
+---
 
 下面的例子，说明了 Closure 相关的生命周期：
 
@@ -2529,7 +2537,7 @@ fn sort_by_statistic(cities: &mut Vec<City>, stat: Statistic) {
 }
 ```
 
-----
+---
 
 线程相关的复杂例子：
 
@@ -2626,7 +2634,7 @@ fn main() {
 }
 ```
 
-----
+---
 
 **迭代器**（iterator）：对某个序列中的项进行某些处理时，可以使用 iterator：
 
