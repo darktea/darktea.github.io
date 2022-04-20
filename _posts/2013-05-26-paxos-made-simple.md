@@ -1,7 +1,7 @@
 ---
 title: Basic Paxos
 date: 2013-05-26 00:00:00 +0800
-categories: [notes]
+categories: [分布式]
 tags: [paxos]
 ---
 
@@ -302,7 +302,7 @@ acceptor 需要持久化两种信息：
     * 如果 proposer 获得的所有响应都为空，那么群发的「提案」可以是任何内容
   * 每个 acceptor 接收到一个「批准请求」（版本号为 n，内容为 w）：
     * 如果**不违反**之前的承诺（n >= maxVersion 的提案才会被批准），就返回「批准响应」给 proposer
-    * 否则，对这个 批准 请求不做回应
+    * 否则，对这个「批准请求」不做回应
 
 ## 参考文档
 
