@@ -97,11 +97,11 @@ fn main() {
 
 ## 3. move
 
-* **move**：把「值」的所有权转移给另外一个「变量」（owner）（类似 C 语言中的「浅拷贝」）
+* **move**：把「值」的所有权转移给另外一个「变量」（owner）
   * 赋值（=），传递「函数参数」，返回「函数返回值」都会发生 move
 * 一旦某个「变量」的所有权转移（move）走了以后，该「变量」失效，不能再使用这个「变量」
   * 例如：在【函数】和【闭包】中，在入参是 move 的场景（而不是 borrow 的场景），进入函数后，参数和返回值的 owner 关系发生改变，原先的变量不再有效
-* 可以通过实现 Copy trait 把默认的 move 改成 copy（复制，所谓的深拷贝）
+* 可以通过实现 Copy trait 把默认的 move 改成 copy（复制，类似深拷贝）
   * Rust 中，一些简单类型，默认实现了 Copy trait，这些类型统称为 **Copy Type**
   * Copy trait 继承了 Clone trait
 
@@ -125,7 +125,7 @@ fn calculate_length(s: String) -> usize {
 }
 ```
 
-* 和大部分类型不同，Copy Type（integers）不使用 move 规则，而是进行 copy。例如：
+* 和大部分类型不同，Copy Type（例如：integers，整型）不使用 move 规则，而是进行 copy。例如：
 
 ```rust
 #![allow(unused)]
@@ -148,7 +148,7 @@ fn main() {
 其它一些要点：
 
 * 不能把 Vector 中的单个 element move out。例如：let third = v[2]
-  * 这种场景可以 borrow 值。除了 **move** 之外，还可以 **borrow** 一个「值」（后面会详细说）
+  * 这种场景可以使用 borrow。除了 **move** 之外，还可以 **borrow** 一个「值」（后面会详细说）
 
 ## 4. borrowing
 
@@ -168,7 +168,7 @@ fn main() {
 fn calculate_length(s: &String) -> usize {
     // 函数内部使用引用 s（borrowing 到一个字符串的值）
     s.len()
-    // 当函数结束的时候，这个引用（s）被 dropped
+    // 当函数结束的时候，这个引用 s 本身（s 本身也是类型为引用的值）被 dropped
 }
 ```
 
@@ -1468,11 +1468,11 @@ trait AsMut<T: ?Sized> {
 ```rust
 #![allow(unused)]
 
-// 该函数需要的入参是：&Path（借用 Path 的值）
+// 该函数的本义是需要一个 &Path（借用 Path 的值）类型的入参
 fn open(path: &Path) -> Result<File> {}
 ```
 
-事实上，该函数的声明如下：
+但事实上，为了方便，该函数的声明可以是下面这个样子：
 
 ```rust
 #![allow(unused)]
