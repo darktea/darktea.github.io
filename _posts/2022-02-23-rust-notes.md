@@ -720,6 +720,22 @@ fn main() {
 * "您好".len() 返回的是 **byte** 数，而不是字符数。"您好".chars().count() 才返回的是**字符数**
 * &str 不能被修改；所以如果要在运行时修改一个字符串，需要使用 String
   * 不过 make_ascii_uppercase 和 make_ascii_lowercase 这 2 个方法是例外，它们会修改 &mut str
+* 从 String 中拿到对应的 &str。例如，要在一个 String 上进行 match 可以这样：
+
+```rust
+fn main() {
+    let s = String::from("Canada");
+
+    match s.as_str() {
+        "Japan" => {
+            println!("Match");
+        },
+        _ => {
+            println!("Un-Match");
+        }
+    }
+}
+```
 
 ## 9. struct
 
@@ -2442,11 +2458,26 @@ fn main() {
 
 ## 18. closure
 
-* closure 就是可以把函数作为参数来使用。可以把 closure 作为参数的一些库方法：
+* closure 就是匿名函数，可以赋值给变量，也可以作为函数的参数来使用。例如，可以把 closure 作为函数参数的一些库方法：
   * Iterator
   * thread::spawn
-* closure 会自动 borrow 入参的值（默认创建一个指向入参值的引用）
-* 只要 closure 自己会在该引用指向的值的前面被 dropped，那么就是符合生命周期规则，没有问题
+* closure 和函数的不同在于，closure 可以捕获（capture）使用调用者作用域中的值
+
+```rust
+fn main() {
+    let x = 1;
+
+    // sum 是一个 closure。这里就是捕获了作用域中 x 的值（也就是 1）
+    // 这里只是定义了 closure，并不会执行。closure 只有在被调用的时候才会真正执行
+    let sum = |y| x + y;
+
+    // 执行 sum，计算结果是 3
+    assert_eq!(3, sum(2));
+}
+```
+
+* closure 会自动 borrow 捕获的值（默认创建一个指向值的引用）
+  * 只要 closure 自己会在该引用指向的值的之前被 dropped，那么就是符合生命周期规则，没有问题
 
 一个简单的例子：
 
@@ -2454,18 +2485,18 @@ fn main() {
 fn main() {
     let s = "hello";
 
-// f 是一个 closure，它自动 borrow 入参 s
+    // f 是一个 closure，它捕获 s，并自动进行 borrow
     let f = || {
         println!("{}", s);
     };
 
-// f 这个 closure 在 s 之前被 dropped，所以这段代码是 OK 的
+    // f 这个 closure 在 s 之前被 dropped，所以这段代码是 OK 的
     f();
 }
   ```
 
 * 但如果不能保证 closure 自己会在该引用指向的值的前面被 dropped，不能通过编译
-* 此时可以考虑使用 move 关键字，使用 move 关键字后，closure 会把入参的值 move 到 closure 内部，并拿到这个值的 ownership
+* 此时可以考虑使用 move 关键字，使用 move 关键字后，closure 会把捕获的值 move 到 closure 内部，并拿到这个值的 ownership
   * 然后当这个 closure 被 dropped 的时候，这个参数的值也会被 dropped
 
 一个简单的例子：
@@ -2474,15 +2505,15 @@ fn main() {
 fn main() {
     let s = "hello";
 
-// f 是一个 closure，它 move 值 s，并拿到 s 的 ownership
+    // f 是一个 closure，它捕获到 s，并进行 move，并拿到 s 的 ownership
     let f = move || {
         println!("{}", s);
     };
 
     f();
 
-// 之后，当 f 这个 closure 被 dropped，s 也会被 dropped
-// 如果之后还需要使用这个 s，只能在 move 之前 clone 出一份
+    // 之后，当 f 这个 closure 被 dropped，s 也会被 dropped
+    // 如果之后还需要使用这个 s，只能在 move 之前 clone 出一份
 }
 ```
 
@@ -2493,15 +2524,15 @@ fn main() {
     let s = "hello";
     let s2 = s.clone();
 
-// move 的时候，用 s2
+    // move 的时候，用 s2
     let f = move || {
         println!("{}", s2);
     };
 
     f();
 
-// 之后，当 f 这个 closure 被 dropped，s2 会被 dropped
-// 而 s 还可以继续被使用
+    // 之后，当 f 这个 closure 被 dropped，s2 会被 dropped
+    // 而 s 还可以继续被使用
 }
 ```
 
