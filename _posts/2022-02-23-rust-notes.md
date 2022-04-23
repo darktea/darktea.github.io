@@ -433,16 +433,28 @@ fn main() {
 ## 8. collections
 
 * collections 存放的是指向 heap 上的数据的指针的集合（和 array/tuple 不一样）：
-  * vector：存放同种类型的元素
+  * vector：可变长度，并且存放同种类型的元素
   * string：Rust 标准库提供了 String 类型
   * hash map
 
 ### a. vector
 
+* 一些创建 vector 的例子：
+
+```rust
+// 使用 vec! macro
+let mut primes = vec![2, 3, 5, 7];
+
+// 使用 Vec::new
+let mut pal = Vec::new();
+pal.push("step");
+
+
+```
+
 * 两种方法获取 vector 中的某个元素
   * let does_not_exist = &v[100]; // 直接 panic，如果数组的 size 小于 100
   * let does_not_exist = v.get(100); // 返回 None，如果数组的 size 小于 100
-
 * 下面代码编译时直接报错：first 是不变引用；但 **push 的时候发生的 borrow 行为**：编译失败。
 
 ```rust
@@ -1625,15 +1637,18 @@ trait From<T>: Sized {
 
 Rust 的 IO 标准库重点就是 3 个 traits：
 
-* Read：统称 Reader，具体的实现包括：Stdin，File，TcpStream
-* BufRead：就是 buffered Reader，继承了 Read trait；具体的实现包括：BufferReader，Cursor，StdinLock
-* Write：统称 Writer，具体的实现包括：Stdout，Stderr，File。。。
+* **Read**：统称 Reader，具体的实现包括：Stdin，File，TcpStream
+* **BufRead**：也是 Reader 的一种：就是 buffered Reader，继承了 Read trait；其内部有 buffer，这样读的效率会更高效。具体的实现包括：BufferReader，Cursor，StdinLock
+  * 如果需要在一个文件上重复读很多次，每次又只读少量数据，会比较低效；先读大块数据到 buffer 里面会更高效
+  * 比如 File 类型只实现了 Read，如果需要更高效的读文件，可以考虑使用实现了 BufRead 的 BufReader
+* **Write**：统称 Writer，具体的实现包括：Stdout，Stderr，File。。。
 
 ### a. Read
 
-这里只重点介绍一个重点方法：
+这里只重点介绍一些重点方法：
 
 * reader.read(&mut buffer)：把 byte 数据读到指定的 buffer 中（buffer 空间事先已经分配好了），然后返回实际读到的数据的长度。如果出错的话，就返回 io::Error
+* reader.read_to_end(&mut byte_vec)：把整个数据内容读到 byte_vec （Vec\<u8>）中
 
 ### b. BufRead
 
@@ -1641,6 +1656,28 @@ BufRead 的重点方法：
 
 * reader.read_line(&mut line)：按 line 把数据读入到一个 String 类型中（结果包括行分割符：\n，\r\n）。返回本次读到的 byte 数
 * reader.lines()：返回一个 iterator，然后通过迭代拿到一个 io::Result\<String>；同时 \n 不会被放到读到的 String 中
+
+一个例子，利用 BufReader（实现了 BufRead）来读取文件：
+
+```rust
+use std::io::{self, BufReader};
+use std::io::prelude::*;
+use std::fs::File;
+
+fn main() -> io::Result<()> {
+    // File 没有 buffer
+    let f = File::open("foo.txt")?;
+    // 使用带 buffer 的 BufReader
+    let f = BufReader::new(f);
+
+    // BufReader 实现了 BufRead，可以利用 lines() 方法来读取文件，更加高效
+    for line in f.lines() {
+        println!("{}", line.unwrap());
+    }
+
+    Ok(())
+}
+```
 
 ### c. Write
 
