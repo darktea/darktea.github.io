@@ -820,16 +820,20 @@ struct Color(i32, i32, i32);
 
 ## 10. enum
 
-Rust 的枚举（enum）可以包含多种不同类型。例如：
+Rust 的枚举（enum）中的「成员」可以**存储各种类型**。例如：
 
 ```rust
 #![allow(unused)]
 
 fn main() {
     enum Message {
+        // 普通「枚举成员」，没有嵌入任何其他类型
         Quit,
+        // 存储了一个匿名 struct 的「枚举成员」
         Move { x: i32, y: i32 },
+        // 存储一个 String 类型的「枚举成员」
         Write(String),
+        // 存储了 3 个 i32 的「枚举成员」
         ChangeColor(i32, i32, i32),
     }
 }
@@ -877,42 +881,63 @@ enum Option<T> {
   * 代码：进入该分支后需要执行的代码；
     * 而且每个分支的执行代码有一个结果值，被匹配到的分支的结果值就是整个 match 表达式的值
 
-给一个复杂的例子：
+枚举的成员是 struct 的例子：
 
 ```rust
 #![allow(unused)]
 
-fn main() {
-    #[derive(Debug)]
+pub enum Protection {
+    // 枚举成员是一个匿名的 struct
+    Secure { version: u64 },
+    Insecure,
+}
 
-    // 所有州的名字
-    enum UsState {
-        Alabama,
-        Alaska,
-    }
-
-    // 各种面值的硬币，但 Quarter 面值的硬币有点特殊，不同州的 Quarter 硬币虽然面额相同，但硬币造型可能不一样
-    enum Coin {
-        Penny,
-        Nickel,
-        Dime,
-        Quarter(UsState),
-    }
-
-    fn value_in_cents(coin: Coin) -> u8 {
-        match coin {
-            Coin::Penny => 1,
-            Coin::Nickel => 5,
-            Coin::Dime => 10,
-            Coin::Quarter(state) => {
-                // 不同州的 Quarter 硬币需要额外执行以下打印州名的动作（虽然返回值都同样是 25）
-                println!("State quarter from {:?}!", state);
-                25
-            }
+fn process(prot: Protection) {
+    match prot {
+        // 匹配的时候，匿名 struct 的值：{version}
+        Protection::Secure { version } => {
+            println!("Hacker-safe thanks to protocol v{}", version);
+        }
+        Protection::Insecure => {
+            println!("Come on in");
         }
     }
 }
 
+fn main() {
+    process(Protection::Secure { version: 2 })
+}
+```
+
+问题：如果 match 的表达式是一个「引用」，那么 match 匹配的值是否也是「引用」？看一个例子：
+
+```rust
+#![allow(unused)]
+
+pub enum Protection {
+    // 枚举成员存储了一个 SecureVersion 类型的值
+    Secure(SecureVersion),
+    Insecure,
+}
+
+#[derive(Debug)]
+pub enum SecureVersion {
+    V1,
+    V2,
+    V2_1,
+}
+
+fn process(prot: &Protection) {
+    match prot {
+        // 答案：这里的 version 是一个引用：&SecureVersion
+        Protection::Secure(version) => {
+            println!("Hacker-safe thanks to protocol {version:?}");
+        }
+        Protection::Insecure => {
+            println!("Come on in");
+        }
+    }
+}
 ```
 
 ## 12. module
@@ -1075,7 +1100,13 @@ Result 配合 unwrap 的使用：
 use std::fs::File;
 
 fn main() {
+    // unwrap()：成功的话，从 Result<T> 中拿到 T，失败的话，panic
+    // 不推荐使用，因为一般来说，不应该使用 panic
     let f = File::open("hello.txt").unwrap();
+
+    // 一般推荐的做法有 2 种：
+    // 1) 使用 unwrap_or_else：成功拿到 T；失败的话，通过执行一个 closure 得到 T
+    // 2) 或者把异常传递到调用者
 }
 ```
 
