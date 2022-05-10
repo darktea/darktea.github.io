@@ -58,7 +58,7 @@ tags: [cmake, makefile, bazel]
 
 * CMake 中可以使用 list；同时提供了 **list 命令**来操控 list。例如：
 
-```cmak
+```cmake
 # 把 "${CMAKE_SOURCE_DIR}/cmake" 添加（append）到 CMAKE_MODULE_PATH 路径中去
 # 其中：
 # CMAKE_SOURCE_DIR 是当前项目的顶级目录
