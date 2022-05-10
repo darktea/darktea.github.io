@@ -818,6 +818,66 @@ fn main() {
 struct Color(i32, i32, i32);
 ```
 
+* **struct update**。如下例子：
+
+```rust
+struct User {
+    active: bool,
+    // 注意：这里的 username 是 String 类型，一旦发生 move，整个 struct 也不能再被使用
+    username: String,
+    email: String,
+    sign_in_count: u64,
+}
+
+fn main() {
+    // 先定义 user1
+    let user1 = User {
+        email: String::from("someone@example.com"),
+        username: String::from("someusername123"),
+        active: true,
+        sign_in_count: 1,
+    };
+
+    // 然后通过更新的方式来定义 user2
+    // 注意：这里发生了一次 String 类型 username 的 move，之后不能再使用 user1
+    let user2 = User {
+        active: user1.active,
+        username: user1.username,
+        // 实际上 user1 和 user2 只有 email 这 1 个字段不同
+        email: String::from("another@example.com"),
+        sign_in_count: user1.sign_in_count,
+    };
+}
+```
+
+* 上面的例子也可以采用**简约写法**：
+
+```rust
+struct User {
+    active: bool,
+    username: String,
+    email: String,
+    sign_in_count: u64,
+}
+
+fn main() {
+    // 先定义 user1
+    let user1 = User {
+        email: String::from("someone@example.com"),
+        username: String::from("someusername123"),
+        active: true,
+        sign_in_count: 1,
+    };
+
+    // 注意：这里发生了一次 String 类型 username 的 move，之后不能再使用 user1
+    let user2 = User {
+        // 实际上 user1 和 user2 只有 email 这 1 个字段不同，采用了 ..user1 这种简约写法
+        email: String::from("another@example.com"),
+        ..user1
+    };
+}
+```
+
 ## 10. enum
 
 Rust 的枚举（enum）中的「成员」可以**存储各种类型**。例如：
@@ -1265,6 +1325,45 @@ impl From<sqlx::Error> for SubscribeError {
 
 ```rust
 use log::*;
+```
+
+* 真正输出日志，除了「日志门面库」之外，还需要「日志库」。这里重点介绍一下 **tracing** 库
+* 由于很多场景，记录日志时，需要区分不同的「执行流」，并能在日志中查看属于某个「执行流」的所有日志。tracing 库引入了 **span** 概念
+  * 例如：在服务端，按某一次用户请求来记录日志，然后可以在服务端日志里面查看这次请求的执行流程。那么服务端对这次请求处理的开始到结束就是一个 **span**
+  * 也就是说，可以利用 tracing 库来跟踪**「逻辑上下文」**
+* tracing 使用「结构化数据」来记录「逻辑上下文」的信息（一般来说就是 kv 对）。然后在最后输出的每条日志中，同时输出这个 kv 对的值。例如如下输出（每条日志都输出了每次请求的 client.addr 的值，用来标明每条日志的「逻辑上下文」）：
+
+```shell
+DEBUG server{client.addr=106.42.126.8:56975}: accepted connection
+DEBUG server{client.addr=82.5.70.2:53121}: closing connection
+DEBUG server{client.addr=89.56.1.12:55601} request{path="/posts/tracing" method=GET}: received request
+DEBUG server{client.addr=111.103.8.9:49123}: accepted connection
+DEBUG server{client.addr=106.42.126.8:56975} request{path="/" method=PUT}: received request
+DEBUG server{client.addr=113.12.37.105:51342}: accepted connection
+ WARN server{client.addr=106.42.126.8:56975} request{path="/" method=PUT}: invalid request headers
+TRACE server{client.addr=106.42.126.8:56975} request{path="/" method=PUT}: closing connection
+```
+
+最后给一个异步代码使用 tracing 的例子：
+
+```rust
+// 对每个用户请求 spawn 一个异步任务
+tokio::spawn(async move {
+    let fd = socket.as_raw_fd();
+
+    if let Err(err) = process(socket, fd, &mut cli).await {
+        error!("this client has an error, disconnect it {}!", err);
+    }
+ });
+
+// 然后利用 tracing 的 instrument 宏，指明用于「逻辑上下文」的数据为 fd
+#[instrument(skip(socket, cli))]
+pub async fn process(socket: TcpStream, fd: i32, cli: &mut reqwest::Client) -> Result<()> {
+    // 最后日志输出的时候，都会带上 fd 的值作为
+    info!("the server accepted a new client. fd is: {}", fd);
+    // 例如这个日志输出：
+    // 2022-04-26T08:00:28.904581Z  INFO process{fd=10}: rmr: the server accepted a new client. fd is: 10
+}
 ```
 
 ## 14. traits
@@ -2316,6 +2415,10 @@ struct WaitingOnReadState<'a> {
 
 * Reactor 负责封装底层的事件通知，例如 异步 IO，异步 Sleep 等
 * Executor 负责执行 Future（前面的小节已经介绍过）
+* Executor 和 Reactor 利用 **Waker**（Rust 标准库定义）进行交互：
+  * Executor 执行 Future 进行 poll，并把 waker 作为调用时的入参
+  * Reactor 执行底层 IO 操作，并接收到 waker
+  * 当 IO 完成时，Reactor 利用 waker 通知 Executor 继续推进 Future 的执行
 
 目前有一些流行的「异步运行时」，本节重点介绍 Tokio（值得注意的是，一旦你的项目选择了某个「异步运行时」，不太可能后续又能切到其他的「异步运行时」）。
 
