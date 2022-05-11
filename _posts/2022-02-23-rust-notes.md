@@ -1,7 +1,7 @@
 ---
 title: Rust Notes
 date: 2022-02-23 00:00:00 +0800
-categories: [notes]
+categories: [编程]
 tags: [rust]
 ---
 

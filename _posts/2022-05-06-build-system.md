@@ -1,7 +1,7 @@
 ---
 title: Build Systems
 date: 2022-05-06 00:00:00 +0800
-categories: [notes]
+categories: [工具]
 tags: [cmake, makefile, bazel]
 ---
 
