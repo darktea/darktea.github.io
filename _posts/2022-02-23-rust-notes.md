@@ -442,14 +442,16 @@ fn main() {
 * 一些创建 vector 的例子：
 
 ```rust
+#![allow(unused)]
+
+fn main() {
 // 使用 vec! macro
-let mut primes = vec![2, 3, 5, 7];
+    let mut primes = vec![2, 3, 5, 7];
 
 // 使用 Vec::new
-let mut pal = Vec::new();
-pal.push("step");
-
-
+    let mut pal = Vec::new();
+    pal.push("step");
+}
 ```
 
 * 两种方法获取 vector 中的某个元素
@@ -741,7 +743,7 @@ fn main() {
     match s.as_str() {
         "Japan" => {
             println!("Match");
-        },
+        }
         _ => {
             println!("Un-Match");
         }
@@ -821,6 +823,8 @@ struct Color(i32, i32, i32);
 * **struct update**。如下例子：
 
 ```rust
+#![allow(unused)]
+
 struct User {
     active: bool,
     // 注意：这里的 username 是 String 类型，一旦发生 move，整个 struct 也不能再被使用
@@ -853,6 +857,8 @@ fn main() {
 * 上面的例子也可以采用**简约写法**：
 
 ```rust
+#![allow(unused)]
+
 struct User {
     active: bool,
     username: String,
@@ -1347,22 +1353,26 @@ TRACE server{client.addr=106.42.126.8:56975} request{path="/" method=PUT}: closi
 最后给一个异步代码使用 tracing 的例子：
 
 ```rust
+#![allow(unused)]
+
+fn main() {
 // 对每个用户请求 spawn 一个异步任务
-tokio::spawn(async move {
-    let fd = socket.as_raw_fd();
+    tokio::spawn(async move {
+        let fd = socket.as_raw_fd();
 
-    if let Err(err) = process(socket, fd, &mut cli).await {
-        error!("this client has an error, disconnect it {}!", err);
+        if let Err(err) = process(socket, fd, &mut cli).await {
+            error!("this client has an error, disconnect it {}!", err);
+        }
+    });
+
+    // 然后利用 tracing 的 instrument 宏，指明用于「逻辑上下文」的数据为 fd
+    #[instrument(skip(socket, cli))]
+    pub async fn process(socket: TcpStream, fd: i32, cli: &mut reqwest::Client) -> Result<()> {
+        // 最后日志输出的时候，都会带上 fd 的值作为
+        info!("the server accepted a new client. fd is: {}", fd);
+        // 例如这个日志输出：
+        // 2022-04-26T08:00:28.904581Z  INFO process{fd=10}: rmr: the server accepted a new client. fd is: 10
     }
- });
-
-// 然后利用 tracing 的 instrument 宏，指明用于「逻辑上下文」的数据为 fd
-#[instrument(skip(socket, cli))]
-pub async fn process(socket: TcpStream, fd: i32, cli: &mut reqwest::Client) -> Result<()> {
-    // 最后日志输出的时候，都会带上 fd 的值作为
-    info!("the server accepted a new client. fd is: {}", fd);
-    // 例如这个日志输出：
-    // 2022-04-26T08:00:28.904581Z  INFO process{fd=10}: rmr: the server accepted a new client. fd is: 10
 }
 ```
 
@@ -2444,7 +2454,7 @@ async fn main() {
     // async block 就是这个「异步任务」要做的事情（本身是返回一个 Future）
     // 返回一个 JoinHandle（handle）对应这个「异步任务」
     let handle = tokio::spawn(async {
-       10086
+        10086
     });
 
     // JoinHandle 本身也是一个 Future
@@ -2636,6 +2646,7 @@ fn main() {
 
 ```rust
 #![allow(unused)]
+
 fn main() {
     use std::thread;
     use std::time::Duration;
@@ -2855,14 +2866,18 @@ fn count_selected_cities(cities: &Vec<City>, test_fn: F) -> usize
 一个 Fn Mut 的例子：
 
 ```rust
-let mut i = 0;
+#![allow(unused)]
+
+fn main() {
+    let mut i = 0;
 
 // 这个 closure（incr）就是一个 FnMut：borrow 了 外部值 i 的可变引用
 // 所以要在 incr 前面加一个 mut
-let mut incr = || {
-    i += 1; // incr borrows a mut reference to i
-    println!("Ding! i is now: {}", i);
-};
+    let mut incr = || {
+        i += 1; // incr borrows a mut reference to i
+        println!("Ding! i is now: {}", i);
+    };
+}
 ```
 
 总结：
