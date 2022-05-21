@@ -48,7 +48,15 @@ tags: [cmake, makefile, bazel]
 * CMakeLists.txt：在项目的顶层目录下，cmake 执行时从这个文件开始执行
 * 以 cmake 为文件后缀的文件
 
-### 4. 更多细节
+### 4. 最佳实践
+
+* 把一个大的 Project 进行拆分；而且是拆分成不同的目录，每个目录为项目的一个组成部分。例如：
+  * 代码、测试、文档、外部依赖，脚本等
+  * 而每一个组成部分又可以进行进一步拆分，代码目录可以再拆分成库代码，执行程序代码等等
+
+> 可以使用 CMake 提供的 **add_subdirectory** 命令实现项目的拆分
+
+### 5. 更多细节
 
 我们给出了一个 CMake 项目的常用结构，可以直接参考（其中的 CMakeLists.txt 中有详细的注释说明）：
 
@@ -65,3 +73,79 @@ tags: [cmake, makefile, bazel]
 # CMAKE_MODULE_PATH 是 cmake module（cmake 模块）所在的目录
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 ```
+
+* CMake 的变量（variable）的作用域（scope）比较复杂；分为 2 种作用域：
+  * Function Scope
+  * Directory Scope
+
+我们这里只简单的通过一个例子简单说明一下 Function 作用域：
+
+```cmake
+cmake_minimum_required(VERSION 3.20.0)
+project(Scope)
+
+function(Inner)
+# 进入 inner 函数后，变量 V 的值还是上一层函数的值 2
+  message("  > Inner: ${V}")
+# 在函数中使用 set 命令会把 V 的值改为 3
+  set(V 3)
+# V 的当前值为 3
+  message("  < Inner: ${V}")
+endfunction()
+
+function(Outer)
+# 进入函数后，全局变量 V 的值不变，还是 1
+  message(" > Outer: ${V}")
+# 在函数中使用 set 命令会把 V 的值改为 2
+  set(V 2)
+# 调用下一级函数 inner
+  Inner()
+# 从 inner 函数返回以后，V 的值恢复到 2
+  message(" < Outer: ${V}")
+endfunction()
+
+# 设置全局变量 V 的值为 1
+set(V 1)
+message("> Global: ${V}")
+
+# 调用函数 Outer
+Outer()
+
+# 从函数 Outer 返回后，V 的值恢复到 1
+message("< Global: ${V}")
+```
+
+运行这个例子可以得到结果：
+
+```shell
+> Global: 1
+ > Outer: 1
+  > Inner: 2
+  < Inner: 3
+ < Outer: 2
+< Global: 1
+```
+
+另外，如果上面例子的 inner 函数改为：
+
+```cmake
+function(Inner)
+  message("  > Inner: ${V}")
+# 使用 PARENT_SCOPE 修改上一层函数中 V 的值；
+# 但不会修改本函数和全局的 V 的值
+  set(V 3 PARENT_SCOPE)
+  message("  < Inner: ${V}")
+endfunction()
+```
+
+运行结果如下（Outer 函数的打印为 Out: 3）：
+
+```shell
+> Global: 1
+ > Outer: 1
+  > Inner: 2
+  < Inner: 2
+ < Outer: 3
+< Global: 1
+```
+
