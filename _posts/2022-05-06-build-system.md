@@ -9,7 +9,7 @@ tags: [cmake, makefile, bazel]
 
 ### 1. Modern CMake
 
-**Modern CMake**: 围绕着 targets 来管理对应用的构建。同时要成功构建 target，也需要配置 target 对应的 properties。
+**Modern CMake**: 围绕着 targets 来管理应用的构建。同时，要成功构建 target，也需要配置 target 对应的 properties。
 
 * **Target**：target 就是被构建应用的各个组件的抽象。一个可执行文件是一个 target，一个库是一个 target
   * 构建一个应用就是构建一系列 targets 的集合。而且这些 targets 可能互相依赖
@@ -55,6 +55,10 @@ tags: [cmake, makefile, bazel]
   * 而每一个组成部分又可以进行进一步拆分，代码目录可以再拆分成库代码，执行程序代码等等
 
 > 可以使用 CMake 提供的 **add_subdirectory** 命令实现项目的拆分
+
+* CMake 提供了一个 **Unit Test 规范（CTest）**，只要按照 CTest 规范进行配置，可以集成各种 Unit Test 框架。从而实现 Unit Test 的自动化运行
+  * 推荐使用 GTest 框架，能够和 CMake 有很好的配合
+  * C 语言的话，我现在使用 [Tau](https://github.com/jasmcaus/tau)
 
 ### 5. 更多细节
 
@@ -149,3 +153,151 @@ endfunction()
 < Global: 1
 ```
 
+### 6. Reference
+
+* [Modern CMake is like inheritance](https://kubasejdak.com/modern-cmake-is-like-inheritance)
+
+### 7. C 语言相关
+
+* 从「可移植」方面来考量的话，就 C 语言中的数据来说，作为一个 programmer，应该尽可能的只关注 value 本身，而不是 value 的具体 representation
+* value 和 representation 之前的相互转换是编译器应该关注的事情
+* C 程序可以抽象成「有序抽象状态机」。「抽象状态机」相关概念包括：
+  * 所谓「有序抽象状态机」就是用来操作 values（在给定时刻，程序的变量，variable，拥有特定的 value）
+  * **value**：就是「值」的抽象概念，和具体的程序是无关的；而且 C 中的 value 都是「数值」（或者可以被转换为「数值」）
+  * **type**：C 语言中，type 是 value 的属性
+    * 所有的 value 的 type 都静态的决定；所谓的「静态类型」
+    * 在一个 value 上可以执行什么操作，由 value 的 type 决定
+    * value 上操作的结果是什么会被 type 决定（但也不能完全被 type 决定，结果也受 binary representation 的影响）
+    * 编译器是否能做一些优化，也受到 type 的影响（例如，对 unsigned int 上的操作做优化时，可以不考虑 overflow）
+  * **binary representation**：type 的二进制表示。例如对一个 16 位的 unsigned int，其二进制表示就很简单：直接用 16 位 bits 表示就行了。一般来说是具体平台无关，也是一种可抽象的概念；而 **object representation** 是和平台相关的概念，不是抽象的，具体由编译器来决定
+
+* **Value**：C 中，value 是抽象实体，抽象于特定的实现，和特定的运行之上。
+  * C 中，所有的 value 都是「数值」，或者可以转换为「数值」
+
+* **Type**：type 是所有的 value 都具有的静态属性（非运行时决定）
+  * type 决定了可以在 value 上做什么操作；type 也会对在 value 上的操作的结果造成影响
+
+* **Binary Representation**：但由于各种平台的差异，C 的标准并不能完全控制所有的具体实现细节；也就是说，即使遵循了 C 标准，也不能完全保证同样的操作在所有平台上的结果完全一致。
+  * binary representation 也会对在 value 上的操作的结果造成影响
+  * 但这里的 binary representation 还是一个抽象的概念，并没有决定 value 物理上具体怎么存储的。value 物理上怎么存储的是 **object representation** 相关的概念
+
+* 总之，「有序状态机」状态的迁移只由 3 个东东决定：value，type，binary representation
+* C 语言中，有几种类型是不能直接做**算术操作**的。所谓的 **narrow types**：unsigned char / unsigned short /  char / signed char / signed short / bool
+  * 在算术表达式中，narrow types 会被做一次 promote，成为 signed int 类型（而不是 unsigned int）；所以干脆最好不要在算术表达式中使用 narrow types
+* 尽量使用 unsigned 类型；同时不要在算术表达式中把 unsigned 类型和 signed 类型混用
+* C 标准中的 stdint.h 头文件里面定义了固定 size 的整数。例如：uint32_t，int32_t 等。但到了具体平台上，并不是每种这些类型都存在
+
+```c
+#include <inttypes.h>
+#include <stdio.h>
+
+uint32_t u = 23;
+
+// 需要使用 PRIu32 来 printf 类型为 uint32_t 的值
+printf("%" PRIu32 "\n", u);
+```
+
+* 当不能用 pure function 解决问题时，需要使用「指针」作为函数参数来解决问题
+  * pure function 就是只用值来传递参数，函数内部对参数的修改不会影响函数返回后入参的值
+* pointer 用来 hold objects 的地址。objects 的 names 就是 variables
+* 「*」号用来定义指针类型时，最好靠左：int\* p＝＆n
+* 「*」号用来「解引用」时，最好靠右：int i＝\*p
+* 如果一个指针指向一个 array object，那么 array object 的长度不能通过对这个指针做 sizeof 操作得到
+  * 指针不是数组
+  * 把指针作为函数的参数时，如果语义上这个指针是一个数组，需要也指定这个数组的长度
+* 对指针之间做减法，只能是当这些指针指向的是同一个 array object 时才行
+  * object 上做 sizeof，返回的结果的类型是：size_t
+  * ptrdiff_t：指针之间相减以后的值的类型是 ptrdiff_t
+  * 使用 printf 打印一个指针时，用 p％，而且要把这个指针 cast 成 void\*
+* C 里面可以把一个类型的 object 强制解释成另外一个不同的类型。但不要这样做，这样做有一个专门的术语：**trap representation**，这是一种 UB 行为。一个指针只能指向 3 种目标：
+  * 有效的 object
+  * 有效位置之后的一个位置
+  * 0（空值）
+* C 里面有空指针的概念，但不能使用宏 NULL 来表示空指针（有坑。目前 C 标准对宏 NULL 的规定比较松散，不严格，底层具体的实现可能和平台相关）。目前推荐的做法是把指针赋值为 0 来表示空指针
+* **opaque structure**：就是不在头文件里面定义 struct。只在头文件里面声明 struct，同时头文件里面的函数的声明只会使用到这个 struct 的指针。例如：
+
+```c
+typedef struct toto toto;
+
+void toto_doit(toto*, unsigned);
+```
+
+* 但是，注意，不要 typedef 指向 struct 的指针
+
+```c
+// 不要这样做
+typedef struct toto_s* toto;
+void toto_doit(toto, unsigned);
+```
+
+* 数组可以被退化成指针。而且一旦退化成指针后，数组的其他信息就都丢失了
+
+```c
+// A 原先是一个数组，取地址后就退化成指针 p 了，后续使用 p 就是作为一个指针来使用
+int A[10] = {0};
+int* p = &A[0];
+```
+
+* 把数组作为参数传给函数时，在数组参数之前增加一个参数来表示数组的长度：
+
+```c
+// len 参数就是用来表示「数组参数」的长度
+// 当然这个 len 的值是否正确，只能是靠程序员来保证了
+double double_copy(size_t len, double target[len], double const source[len]);
+```
+
+* 再澄清一下几个概念
+  * semantic type：也就是语义上的类型。例如 int32_t（即 32 位的整数）
+  * basic type：C 语言中的基本类型。例如 signed int（事实上 int32_t 是用 typedef 到 signed int）
+  * binary reprensentation：二进制表示。signed int 就是 b31, b30, ... b7, ... b0（32 个bits，4 个 bytes）
+  * object reprensentation：C 中所有的 object 都可以用 unsigned char 来表示。如果在一个小端系统中，上面的 binary reprensentation 对应的 object reprensentation 就是 unsigned char[4] 数组，且该数组的 [0] 是最高位，[3] 是最低位（小端系统）
+* 总之，C 对 object 的内存模型做了以下规定：
+  * sizeof(char) 为 1（包括 3 种 char：unsigned char，signed char 和 char）
+  * 类型为 A 的 object 的  object reprensentation 是一个数组：unsigned char[sizeof(A)]
+    * 但不要搞混了，object reprensentation 的 char 是 unsigned char，不是 char
+    * char 只能用于「字符类型」，或者「字符串类型」
+* 能不用 & 操作符（取一个 object 的地址），就不要用；引起潜在的问题（可以参考 Rust 的思想）
+* **void\***：无类型的指针。任pe何对象的指针可以转换为 void*，但也会损失掉这个对象的 type 信息
+  * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。还可以转回来（值能保持一致）
+  * void* 还是能不用就尽量不用
+* cast：**不要用 cast**，坑巨多
+* Effective Type：对 object 的 access 进行限制。关键点如下：
+  * Objects must be accessed through their **effective type** or through a pointer to a character type
+    * union 是个例外：Anymemberofanobjectthathasaneffectiveuniontypecanbeaccessed at any time, provided the byte representation amounts to a valid value of the access type
+  * The effective type of a variable or compound literal is the type of its declaration
+* Files that are written in binary mode (fread, fwrite) are **not portable** between platforms
+* C99 引入了 inline 关键字：
+  * A function definition that is declared with inline can be used in several TUs without causing a multiple-symbol-definition error
+  * All pointers to the same inline function will compare as equal, even if obtained in different TUs
+  * An inline function that is not used in a specific TU will be completely absent from the binary of that TU and, in particular, will not contribute to its size
+* inline 的一个关键点：
+  * An inline function definition is visible in all TUs. 但同时，编译器也不会保证一定会 emit 这个 inline 函数的符号。
+    * 如果要确保该 inline 函数的符号被 emit，可以在 .c 文件中加一行不带 inline 的函数 declare 来确保 emit 函数的符号
+* 总之，inline 函数的最佳实践如下：
+  * An inline definition goes in a header file
+  * An additional declaration without **inline** goes in exactly one TU
+
+例如一个头文件 toto.h 文件：
+
+```c
+// toto.h 文件
+// Inline definition in a header file.
+// Function argument names and local variables are visible
+// to the preprocessor and must be handled with care.
+inline
+toto* toto_init(toto* toto_x) {
+  if (toto_x) {
+    *toto_x = (toto){ 0 };
+  }
+  return toto_x;
+}
+```
+
+其对应的 toto.c 文件：
+
+```c
+#include ”toto.h”
+// Instantiate in exactly one TU.
+// The parameter name is omitted to avoid macro replacement.
+toto* toto_init(toto*);
+```
