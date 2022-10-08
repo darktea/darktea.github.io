@@ -1008,6 +1008,34 @@ fn process(prot: &Protection) {
 
 ## 12. module
 
+基本概念：
+
+* Module：对代码进行组织的单元（逻辑上把对代码分成不同的部分，便于管理）
+* Crate：独立的可编译单元，可以编译为「库」，或者是「可执行文件」
+* Package：类似项目（或者工程）的概念，一个 Package 只能包含一个 Cargo.toml 文件
+  * 一个 Package 只能包含一个「库」；但一个 Package 可以包含多个「可执行文件」
+    * 这里的「库」和「可执行文件」就是上面提到的 Crate：独立的可编译单元
+
+下面给一个典型的 Package（项目）的目录结构：
+
+```shell
+.
+├── Cargo.toml
+├── Cargo.lock
+├── src
+│   ├── main.rs
+│   ├── lib.rs
+│   └── bin
+│       └── main1.rs
+│       └── main2.rs
+├── tests
+│   └── some_integration_tests.rs
+├── benches
+│   └── simple_bench.rs
+└── examples
+    └── simple_example.rs
+```
+
 几个关键词的作用：
 
 * mod
