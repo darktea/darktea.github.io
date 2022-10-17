@@ -3109,3 +3109,33 @@ fn main() {
     temp_vec
 }
 ```
+
+## 21 unsafe
+
+Rust 里面可以通过 2 种方法来标明代码是 unsafe 代码：unsafe block 和 unsafe function。
+
+### a. unsafe block
+
+把 unsafe 关键字放在 block 代码块之前，就标明了一块 unsafe block：
+
+```rust
+unsafe {
+  String::from_utf8_unchecked(ascii)
+}
+```
+
+如果这个代码块前面没有 unsafe 关键字，Rust 编译的时候会提示失败：from_utf8_unchecked 方法只能在 unsafe 下被使用。
+
+unsafe block 解锁了 5 个限制：
+
+* 可以在 unsafe block 内使用 unsafe 函数
+* 可以 defer raw 指针
+* 可以存取 union 中的字段
+* 可以存取「可变 static 变量」（但这样需要由你自己来保证该变量的线程安全）
+* 可以存取由 Rust「外部函数接口」（FFI）定义的函数和变量
+
+一旦使用了 unsafe block 也就是提醒开发人员注意，这部分代码的安全性不再由 Rust 来保证了：
+
+* 避免随意用了 unsafe block，但又完全不了解 block 中的风险所在
+* 在做 code review 时，需要把 unsafe block 特别标注出来，特别对待
+* 在打算使用一个 unsafe block 之前，先自己确认一下是否是真的需要使用 unsafe。例如，如果是出于更好性能考虑，先调研一下，是否真的能提升性能，或者是否存在 Rust safe 的方案来同样达到提升性能的目的
