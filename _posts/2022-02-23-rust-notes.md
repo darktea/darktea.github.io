@@ -3114,13 +3114,13 @@ fn main() {
 
 Rust 里面可以通过 2 种方法来标明代码是 unsafe 代码：unsafe block 和 unsafe function。
 
-### a. unsafe block
+### a. Unsafe Block
 
 把 unsafe 关键字放在 block 代码块之前，就标明了一块 unsafe block：
 
 ```rust
 unsafe {
-  String::from_utf8_unchecked(ascii)
+String::from_utf8_unchecked(ascii)
 }
 ```
 
@@ -3139,3 +3139,109 @@ unsafe block 解锁了 5 个限制：
 * 避免随意用了 unsafe block，但又完全不了解 block 中的风险所在
 * 在做 code review 时，需要把 unsafe block 特别标注出来，特别对待
 * 在打算使用一个 unsafe block 之前，先自己确认一下是否是真的需要使用 unsafe。例如，如果是出于更好性能考虑，先调研一下，是否真的能提升性能，或者是否存在 Rust safe 的方案来同样达到提升性能的目的
+
+给一个 unsafe block 的例子：
+
+```rust
+mod my_ascii {
+    /// An ASCII-encoded string. 
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct Ascii(
+        // This must hold only well-formed ASCII text: 
+        // bytes from `0` to `0x7f`.
+        Vec<u8>
+    );
+
+    impl Ascii {
+        /// Create an `Ascii` from the ASCII text in `bytes`. Return a
+        /// `NotAsciiError` error if `bytes` contains any non-ASCII
+        /// characters.
+        /// 这里保证了数据的正确，一旦数据不是 ASCII 格式，抛 Err
+        pub fn from_bytes(bytes: Vec<u8>) -> Result<Ascii, NotAsciiError> {
+            if bytes.iter().any(|&byte| !byte.is_ascii()) {
+                return Err(NotAsciiError(bytes));
+            }
+            Ok(Ascii(bytes))
+        }
+    }
+
+    // When conversion fails, we give back the vector we couldn't convert. 
+    // This should implement `std::error::Error`; omitted for brevity. 
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct NotAsciiError(pub Vec<u8>);
+
+    // Safe, efficient conversion, implemented using unsafe code.
+    impl From<Ascii> for String {
+        fn from(ascii: Ascii) -> String {
+            // If this module has no bugs, this is safe, because 
+            // well-formed ASCII text is also well-formed UTF-8. 
+            // 这里由程序员保证 unsafe block 的安全：这里 使用 unsafe 函数 from_utf8_unchecked 是安全的
+            // 因为如果是 ASCII，也就是 UTF-8
+            unsafe { String::from_utf8_unchecked(ascii.0) }
+        }
+    }
+}
+```
+
+Ascii 类型可以被使用在 safe 的环境，例如：
+
+```rust
+use my_ascii::Ascii;
+
+let bytes: Vec<u8> = b"ASCII and ye shall receive".to_vec();
+// This call entails no allocation or text copies, just a scan.
+let ascii: Ascii = Ascii::from_bytes(bytes).unwrap();
+
+// We know these chosen bytes are ok.
+// This call is zero-cost: no allocation, copies, or scans.
+let string = String::from(ascii);
+assert_eq!(string, "ASCII and ye shall receive");
+```
+
+### b. Unsafe Function
+
+* 函数定义前面加一个 unsafe 关键字，就定义一个 unsafe function。unsafe function 的函数体就是一个 unsafe block
+* 只能在 unsafe block 里面调用 unsafe function
+* 一旦定义了一个 unsafe function，就是告诉它的调用者必须按照约定来调用该函数，否则就可能出现 UB
+
+给个例子：
+
+```rust
+// This must be placed inside the `my_ascii` module.
+impl Ascii {
+    /// Construct an `Ascii` value from `bytes`, without checking
+    /// whether `bytes` actually contains well-formed ASCII.
+    ///
+    /// This constructor is infallible, and returns an `Ascii` directly, 
+    /// rather than a `Result<Ascii, NotAsciiError>` as the `from_bytes` /// constructor does.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `bytes` contains only ASCII
+    /// characters: bytes no greater than 0x7f. Otherwise, the effect is 
+    /// undefined.
+    /// 也就是说，必须由调用者来保证安全性。
+    /// 由调用者来保证这个 Safety 声明：bytes 参数必须是合法的 ASCII 字符串
+    pub unsafe fn from_bytes_unchecked(bytes: Vec<u8>) -> Ascii {
+        Ascii(bytes)
+    }
+}
+```
+
+2 个关键事实：
+
+* 在进入 unsafe block 之前的代码如果存在 bug，可能就会破坏协议；也就是说，协议被破坏，可能的原因不单是 unsafe block 本身里面有问题，unsafe block 之前的代码存在问题也会破坏协议
+* 如果出现了 UB，UB 引起的问题不一定在 unsafe block 中爆出来，而是有可能在 unsafe block 之后才爆出来
+
+>  一旦使用了 unsafe block，就是告诉 Rust：信任了，我保证所有都 OK。
+>
+> 但这种「保证」依赖所有会影响 unsafe block 的因素是否 OK。
+>
+> 同时，一旦出现 UB，UB 引发的问题可能出现在任何被这个 unsafe block 影响的地方。
+
+### c. Unsafe Block or Unsafe Function
+
+使用 unsafe block，还是使用 unsafe function？
+
+如果能保证只要正常使用就不会破坏 Rust 的安全性，就不需要指明函数是 unsafe 的。否则，才需要使用 unsafe function，并提供安全协议给其调用者。
+
