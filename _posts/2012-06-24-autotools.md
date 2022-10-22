@@ -110,8 +110,10 @@ hello: main.c
 例如, 只要在 Makefile.am 中写两行：
 
 ```shell
-bin_PROGRAMS = hello (目标)
-hello_SOURCES = main.c (所依赖的源文件)
+# 目标
+bin_PROGRAMS = hello
+# 所依赖的源文件
+hello_SOURCES = main.c
 ```
 
 然后 Automake 就可以根据 Makefile.am 的描述自动生成 Makefile.in 模版文件。

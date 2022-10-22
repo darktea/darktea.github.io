@@ -3119,8 +3119,10 @@ Rust 里面可以通过 2 种方法来标明代码是 unsafe 代码：unsafe blo
 把 unsafe 关键字放在 block 代码块之前，就标明了一块 unsafe block：
 
 ```rust
-unsafe {
-String::from_utf8_unchecked(ascii)
+fn main() {
+    unsafe {
+        String::from_utf8_unchecked(ascii)
+    }
 }
 ```
 
@@ -3186,16 +3188,18 @@ mod my_ascii {
 Ascii 类型可以被使用在 safe 的环境，例如：
 
 ```rust
-use my_ascii::Ascii;
+fn main() {
+    use my_ascii::Ascii;
 
-let bytes: Vec<u8> = b"ASCII and ye shall receive".to_vec();
+    let bytes: Vec<u8> = b"ASCII and ye shall receive".to_vec();
 // This call entails no allocation or text copies, just a scan.
-let ascii: Ascii = Ascii::from_bytes(bytes).unwrap();
+    let ascii: Ascii = Ascii::from_bytes(bytes).unwrap();
 
 // We know these chosen bytes are ok.
 // This call is zero-cost: no allocation, copies, or scans.
-let string = String::from(ascii);
-assert_eq!(string, "ASCII and ye shall receive");
+    let string = String::from(ascii);
+    assert_eq!(string, "ASCII and ye shall receive");
+}
 ```
 
 ### b. Unsafe Function
@@ -3233,7 +3237,7 @@ impl Ascii {
 * 在进入 unsafe block 之前的代码如果存在 bug，可能就会破坏协议；也就是说，协议被破坏，可能的原因不单是 unsafe block 本身里面有问题，unsafe block 之前的代码存在问题也会破坏协议
 * 如果出现了 UB，UB 引起的问题不一定在 unsafe block 中爆出来，而是有可能在 unsafe block 之后才爆出来
 
->  一旦使用了 unsafe block，就是告诉 Rust：信任了，我保证所有都 OK。
+> 一旦使用了 unsafe block，就是告诉 Rust：信任了，我保证所有都 OK。
 >
 > 但这种「保证」依赖所有会影响 unsafe block 的因素是否 OK。
 >
@@ -3245,3 +3249,12 @@ impl Ascii {
 
 如果能保证只要正常使用就不会破坏 Rust 的安全性，就不需要指明函数是 unsafe 的。否则，才需要使用 unsafe function，并提供安全协议给其调用者。
 
+### d. Unsafe Trait
+
+Unsafe Trait：如果一个 trait，需要在实现时遵循一个「契约」，同时这个「契约」需要开发者来保证，而 Rust 不能 check 这个「契约」；那么这个 trait 就是 Unsafe Trait。
+
+在实现 Unsafe Trait 时，必须把实现标为 unsafe 的。
+
+如果把一个函数的类型变量绑定到一个 Unsafe Trait 上，那么这个函数本身也肯定是 unsafe。而这个 unsafe 函数的「契约」肯定就会和 Unsafe Trait 的「契约」相关联。
+
+一个例子：std::marker::Send 就是一个 Unsafe Trait，而且 std::marker::Send 不会有任何方法，这个 trait 只是用来标明实现了这个 trait 的类型必须满足能被安全移动到其他线程的「契约」。
