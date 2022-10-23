@@ -3110,7 +3110,7 @@ fn main() {
 }
 ```
 
-## 21 unsafe
+## 21. unsafe
 
 Rust 里面可以通过 2 种方法来标明代码是 unsafe 代码：unsafe block 和 unsafe function。
 
@@ -3192,17 +3192,19 @@ fn main() {
     use my_ascii::Ascii;
 
     let bytes: Vec<u8> = b"ASCII and ye shall receive".to_vec();
-// This call entails no allocation or text copies, just a scan.
+    // This call entails no allocation or text copies, just a scan.
     let ascii: Ascii = Ascii::from_bytes(bytes).unwrap();
 
-// We know these chosen bytes are ok.
-// This call is zero-cost: no allocation, copies, or scans.
+    // We know these chosen bytes are ok.
+    // This call is zero-cost: no allocation, copies, or scans.
     let string = String::from(ascii);
     assert_eq!(string, "ASCII and ye shall receive");
 }
 ```
 
 ### b. Unsafe Function
+
+Unsafe Function：
 
 * 函数定义前面加一个 unsafe 关键字，就定义一个 unsafe function。unsafe function 的函数体就是一个 unsafe block
 * 只能在 unsafe block 里面调用 unsafe function
@@ -3237,24 +3239,121 @@ impl Ascii {
 * 在进入 unsafe block 之前的代码如果存在 bug，可能就会破坏协议；也就是说，协议被破坏，可能的原因不单是 unsafe block 本身里面有问题，unsafe block 之前的代码存在问题也会破坏协议
 * 如果出现了 UB，UB 引起的问题不一定在 unsafe block 中爆出来，而是有可能在 unsafe block 之后才爆出来
 
-> 一旦使用了 unsafe block，就是告诉 Rust：信任了，我保证所有都 OK。
+> 一旦使用了 unsafe block，就是告诉 Rust：信任我，我保证所有都 OK。
 >
 > 但这种「保证」依赖所有会影响 unsafe block 的因素是否 OK。
 >
 > 同时，一旦出现 UB，UB 引发的问题可能出现在任何被这个 unsafe block 影响的地方。
 
-### c. Unsafe Block or Unsafe Function
-
 使用 unsafe block，还是使用 unsafe function？
 
 如果能保证只要正常使用就不会破坏 Rust 的安全性，就不需要指明函数是 unsafe 的。否则，才需要使用 unsafe function，并提供安全协议给其调用者。
 
-### d. Unsafe Trait
+### c. Unsafe Trait
 
-Unsafe Trait：如果一个 trait，需要在实现时遵循一个「契约」，同时这个「契约」需要开发者来保证，而 Rust 不能 check 这个「契约」；那么这个 trait 就是 Unsafe Trait。
+Unsafe Trait：如果一个 trait，需要在实现时遵循一个「契约」，同时这个「契约」需要开发者来保证，而 Rust 不能 check 这个「契约」；那么这个 trait 就是 Unsafe Trait：
 
-在实现 Unsafe Trait 时，必须把实现标为 unsafe 的。
+* 在实现 Unsafe Trait 时，必须把实现标为 unsafe 的
+* 如果把一个函数的类型变量绑定到一个 Unsafe Trait 上，那么这个函数本身也肯定是 unsafe。而这个 unsafe 函数的「契约」肯定就会和 Unsafe Trait 的「契约」相关联
+* 一个例子：std::marker::Send 就是一个 Unsafe Trait，而且 std::marker::Send 不会有任何方法，这个 trait 只是用来标记实现了这个 trait 的类型必须满足能被安全移动到其他线程的「契约」
 
-如果把一个函数的类型变量绑定到一个 Unsafe Trait 上，那么这个函数本身也肯定是 unsafe。而这个 unsafe 函数的「契约」肯定就会和 Unsafe Trait 的「契约」相关联。
+### d. Raw Pointer
 
-一个例子：std::marker::Send 就是一个 Unsafe Trait，而且 std::marker::Send 不会有任何方法，这个 trait 只是用来标明实现了这个 trait 的类型必须满足能被安全移动到其他线程的「契约」。
+Rust 中有 2 类 Raw Pointers：
+
+* *mut T：允许修改该指针指向的数据
+* *const T：只能读取该指针指向的数据，不能通过这个指针修改其指向的数据
+
+通过对「引用」进行转换来创建 Raw Pointer，然后用 * 操作符来对 Raw Pointer 做「解引用」。例如：
+
+```rust
+fn main() {
+    let mut x = 10;
+    // 把 &mut 转成 *mut
+    let ptr_x = &mut x as *mut i32;
+
+    let y = Box::new(20);
+    // 先把 y 解成 *y，然后把 &*y 转换成 *const
+    let ptr_y = &*y as *const i32;
+
+    // 解 Raw 指针操作必须 unsafe
+    unsafe {
+        *ptr_x += *ptr_y;
+    }
+
+    assert_eq!(x, 30);
+}
+```
+
+注意：只有对「Raw 指针」进行 dereference（解引用）是 unsafe，其他操作（比如创建 Raw Pointer）是安全的。
+
+不能再把「Raw 指针」转回成「引用」，只能 borrow 解「Raw 指针」的结果。
+
+下面看一个例子：
+
+```rust
+/// 如果某个类型的值是 2-byte 对齐的，可以使用一个技巧：
+/// 把一个 bool 值（true or false）也存在这个单个值里面。
+mod ref_with_flag {
+    use std::marker::PhantomData;
+    use std::mem::align_of;
+
+    /// A `&T` and a `bool`, wrapped up in a single word.
+    /// The type `T` must require at least two-byte alignment.
+    pub struct RefWithFlag<'a, T> {
+        ptr_and_bit: usize,
+        behaves_like: PhantomData<&'a T> // behaves_like 字段不占用内存空间
+    }
+
+    impl<'a, T: 'a> RefWithFlag<'a, T> {
+        pub fn new(ptr: &'a T, flag: bool) -> RefWithFlag<T> {
+            // 如果这个类型不是 2-byte 对齐的，直接失败
+            // 如果 %2 为 0 的话，实际上就可以用最后一个 bit 位来存放 bool 是 true 还是 false
+            assert!(align_of::<T>() % 2 == 0);
+            RefWithFlag {
+                // ptr 是类型的值的「不可变引用」，borrow 进来的
+                // 把 ptr 转成指向该类型的「不变」raw pointer，再强转成 usize
+                // 把 bool 值也强转成 usize
+                // 然后把这 2 个 usize 的值做「或」操作
+                // 这样就实现了用 raw pointer 的最后一个 bit 位来存放 bool 的值：
+                ptr_and_bit: ptr as *const T as usize | flag as usize,
+                behaves_like: PhantomData
+            }
+        }
+
+        pub fn get_ref(&self) -> &'a T {
+            unsafe {
+                // 恢复原先的指针值（恢复最后一个 bit 位）
+                let ptr = (self.ptr_and_bit & !1) as *const T;
+                // 解引用，恢复原先的类型的值
+                &*ptr
+            }
+        }
+
+        pub fn get_flag(&self) -> bool {
+            // 通过最后一个 bit 位的值来获取 bool 是 true 还是 false
+            self.ptr_and_bit & 1 != 0
+        }
+    }
+}
+
+// 使用 RefWithFlag
+fn main() {
+    use ref_with_flag::RefWithFlag;
+    let vec = vec![10, 20, 30];
+    let flagged = RefWithFlag::new(&vec, true);
+    assert_eq!(flagged.get_ref()[1], 20);
+    assert_eq!(flagged.get_flag(), true);
+}
+```
+
+上面这个例子的一些细节：
+
+* 上面这个技巧首先基于一个事实：raw pointer 和 usize 是可以安全的来回转换的
+* 在 get_ref 中，先用 * 操作符对 raw pointer 进行 deference；然后再用一个 & 对这个 deference 的结果进行 borrow
+* Rust 中，对一个指针的 referent 进行 borrow，可以得到一个不受「生命周期」规则约束的「引用」。但给 Rust 标记出精确的「生命周期」能避免引起错误，所以 get_ref 的返回值，标记了其返回值的「生命周期」和 RefWithFlag 的「生命周期」相同：'a
+  * A pointer's referent object is the object that it is intended to reference
+* PhantomData 作为「影子数据」不占用内存空间；但这个例子中的 PhantomData 字段不可或缺，否则编译失败
+  * struct 中存在引用字段的话，struct 本身不能存活超过这些引用字段所引用的值的「生命周期」，否则就会产生悬挂指针
+  * 所以需要以某种方式标记出 struct 本身的「生命周期」必须和其引用字段的「生命周期」相匹配
+  * 在这个例子中，既然 RefWithFlag 的生命周期不能比 ptr_and_bit 字段的生命周期要长，我们需要对 RefWithFlag 的生命周期进行标记。但又不能对 usize 字段做标记，只能再加一个 PhantomData 引用字段，并把这个字段的生命周期和 RefWithFlag 的生命周期都标记为：'a
