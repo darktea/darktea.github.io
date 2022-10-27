@@ -2,7 +2,7 @@
 title: Build Systems
 date: 2022-05-06 00:00:00 +0800
 categories: [工具]
-tags: [cmake, makefile, bazel]
+tags: [cmake, makefile, bazel, c]
 ---
 
 ## 一. CMake
@@ -157,7 +157,7 @@ endfunction()
 
 * [Modern CMake is like inheritance](https://kubasejdak.com/modern-cmake-is-like-inheritance)
 
-### 7. C 语言相关
+## 二. C 语言相关
 
 * 从「可移植」方面来考量的话，就 C 语言中的数据来说，作为一个 programmer，应该尽可能的只关注 value 本身，而不是 value 的具体 representation
 * value 和 representation 之前的相互转换是编译器应该关注的事情
@@ -249,21 +249,21 @@ double double_copy(size_t len, double target[len], double const source[len]);
 * 再澄清一下几个概念
   * semantic type：也就是语义上的类型。例如 int32_t（即 32 位的整数）
   * basic type：C 语言中的基本类型。例如 signed int（事实上 int32_t 是用 typedef 到 signed int）
-  * binary reprensentation：二进制表示。signed int 就是 b31, b30, ... b7, ... b0（32 个bits，4 个 bytes）
-  * object reprensentation：C 中所有的 object 都可以用 unsigned char 来表示。如果在一个小端系统中，上面的 binary reprensentation 对应的 object reprensentation 就是 unsigned char[4] 数组，且该数组的 [0] 是最高位，[3] 是最低位（小端系统）
+  * binary representation：二进制表示。signed int 就是 b31, b30, ... b7, ... b0（32 个bits，4 个 bytes）
+  * object representation：C 中所有的 object 都可以用 unsigned char 来表示。如果在一个小端系统中，上面的 binary representation 对应的 object representation 就是 unsigned char[4] 数组，且该数组的 [0] 是最高位，[3] 是最低位（小端系统）
 * 总之，C 对 object 的内存模型做了以下规定：
   * sizeof(char) 为 1（包括 3 种 char：unsigned char，signed char 和 char）
-  * 类型为 A 的 object 的  object reprensentation 是一个数组：unsigned char[sizeof(A)]
-    * 但不要搞混了，object reprensentation 的 char 是 unsigned char，不是 char
+  * 类型为 A 的 object 的  object representation 是一个数组：unsigned char[sizeof(A)]
+    * 但不要搞混了，object representation 的 char 是 unsigned char，不是 char
     * char 只能用于「字符类型」，或者「字符串类型」
 * 能不用 & 操作符（取一个 object 的地址），就不要用；引起潜在的问题（可以参考 Rust 的思想）
-* **void\***：无类型的指针。任pe何对象的指针可以转换为 void*，但也会损失掉这个对象的 type 信息
+* **void\***：无类型的指针。任何对象的指针可以转换为 void*，但也会损失掉这个对象的 type 信息
   * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。还可以转回来（值能保持一致）
   * void* 还是能不用就尽量不用
 * cast：**不要用 cast**，坑巨多
 * Effective Type：对 object 的 access 进行限制。关键点如下：
   * Objects must be accessed through their **effective type** or through a pointer to a character type
-    * union 是个例外：Anymemberofanobjectthathasaneffectiveuniontypecanbeaccessed at any time, provided the byte representation amounts to a valid value of the access type
+    * union 是个例外：Any member of an object that has an effective union type can be accessed at any time, provided the byte representation amounts to a valid value of the access type
   * The effective type of a variable or compound literal is the type of its declaration
 * Files that are written in binary mode (fread, fwrite) are **not portable** between platforms
 * C99 引入了 inline 关键字：
