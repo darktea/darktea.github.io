@@ -5,7 +5,7 @@ categories: [notes]
 tags: [bash]
 ---
 
-# 1. 变量
+## 1. 变量
 
 * 变量的赋值用 等号, 但是等号间不能有空格
 
@@ -19,7 +19,7 @@ tags: [bash]
 echo $foo    # prints 42
 ```
 
-# 2. 数组
+## 2. 数组
 
 * 给数组赋值
 
@@ -47,7 +47,7 @@ echo $foo       # prints "a a a"
  echo ${baz[1]}            # prints "b 2"
 ```
 
-# 3. 专用变量
+## 3. 专用变量
 
 ```shell
  echo $0      # 脚本本身的名字
@@ -82,7 +82,7 @@ echo $foo       # prints "a a a"
  
 ```
 
-# 4. 字符串处理
+## 4. 字符串处理
 
 * 替换
 
@@ -107,7 +107,7 @@ echo $foo       # prints "a a a"
  echo ${foo/balls}       # prints I like meat.
 ```
 
-# 5. 数组长度
+## 5. 数组长度
 
 ```shell
 ARRAY=(abcdd b c)
@@ -116,7 +116,7 @@ echo ${#ARRAY}          # prints 5 错误
 echo ${#ARRAY[@]}     # prints 3 正确
 ```
 
-# 6. 引号
+## 6. 引号
 
 ```shell
 world=Earth
@@ -126,6 +126,24 @@ echo $foo            # 单引号, prints Hello, $world!
 echo $bar            # 双引号, prints Hello, Earth!
 ```
 
-# References
+## Bash Idioms
+
+### if 逻辑
+
+```shell
+# 先判断 DIR 变量长度是否为 0，不为 0 的话，才执行 cd 命令
+[[ -n "$DIR" ]] && cd "$DIR"
+
+```
+
+和下面的写法等价：
+
+```shell
+if [[ -n "$DIR" ]]; then
+    cd "$DIR"
+fi
+```
+
+## References
 
 * [Shell programming with bash: by example, by counter-example](http://matt.might.net/articles/bash-by-example/)
