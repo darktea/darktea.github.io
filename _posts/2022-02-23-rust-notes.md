@@ -1580,7 +1580,7 @@ trait Copy: Clone {}
 ```rust
 fn main() {
     let x = 5;
-    // & 引用就是 Rust中的安全指针
+    // & 引用就是 Rust 中的安全指针
     let y = &x;
 
     assert_eq!(5, x);
