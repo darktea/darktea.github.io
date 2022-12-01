@@ -884,6 +884,8 @@ fn main() {
 }
 ```
 
+> 注意：struct 的生命周期请参考：[b. 结构体的生命周期注解](#b-结构体的生命周期注解)
+
 ## 10. enum
 
 Rust 的枚举（enum）中的「成员」可以**存储各种类型**。例如：
@@ -3357,3 +3359,17 @@ fn main() {
   * struct 中存在引用字段的话，struct 本身不能存活超过这些引用字段所引用的值的「生命周期」，否则就会产生悬挂指针
   * 所以需要以某种方式标记出 struct 本身的「生命周期」必须和其引用字段的「生命周期」相匹配
   * 在这个例子中，既然 RefWithFlag 的生命周期不能比 ptr_and_bit 字段的生命周期要长，我们需要对 RefWithFlag 的生命周期进行标记。但又不能对 usize 字段做标记，只能再加一个 PhantomData 引用字段，并把这个字段的生命周期和 RefWithFlag 的生命周期都标记为：'a
+
+struct 的生命周期请参考：[b. 结构体的生命周期注解](#b-结构体的生命周期注解)
+
+#### Nullable Pointers
+
+2 种空指针。分别由 2 个函数返回：
+
+* std::ptr::null\<T\>：返回 \*const T
+* std::ptr::null_mut\<T\>：返回 \*mut T
+
+检查一个 raw pointer 是否是空指针的方法有：
+
+* is_null 方法
+* as_ref 方法或 as_mut 方法。分别用于检查 \*const T 和 \*mut T
