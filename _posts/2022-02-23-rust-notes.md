@@ -14,6 +14,9 @@ tags: [rust]
   * [函数定义使用生命周期注解](#函数定义使用生命周期注解)
   * [结构体的生命周期注解](#结构体的生命周期注解)
 * [pointers](#pointers)
+  * [Box](#box)
+  * [Rc](#rc)
+  * [RefCell](#refcell)
 * [collections](#collections)
   * [vector](#vector)
   * [hash map](#hash-map)
@@ -21,6 +24,7 @@ tags: [rust]
   * [string slice](#string-slice)
 * [struct](#struct)
 * [enum](#enum)
+  * [Patterns](#patterns)
 * [match](#match)
 * [module](#module)
   * [Attribute](#attribute)
@@ -467,10 +471,12 @@ struct S<'a, 'b> {
 Rust 中的指针有 3 种：
 
 * 【引用】：Rust 中安全的指针。也就是【非所有权指针】，分 &T 和 &mut T 两种。其中 &T 本身是一种 Copy 类型；而 &mut T 并没有实现 Copy Trait（Copy **trait** 的细节请参考其他小节）
-* 【原始指针】：也就是 Raw Points，用于 unsafe 代码；这里不详细介绍了
+* 【原始指针】：也就是 Raw Points，用于 [unsafe](#unsafe) 代码；这里不详细介绍了
 * 【智能指针】：智能指针的 2 个关键 **trait**：Drop（离开作用域后，自动释放资源） 和 Deref。标准库提供了几种智能指针：Box\<T>，Rc\<T>，Arc\<T>，Cell\<T>，RefCell\<T>
 
-这里只先给一个使用 Box 的例子，不深入更多具体细节了。
+下面是对其中一些【智能指针】的介绍。
+
+### Box
 
 使用 Box 的例子：
 
@@ -489,6 +495,114 @@ fn main() {
     let y2 = y; // 不能通过生命周期检查，因为 y 已经被释放
 }
 ```
+
+### Rc
+
+使用 Rc 的例子：
+
+```Rust
+use std::rc::Rc;
+    
+// Rust can infer all these types; written out for clarity
+let s: Rc<String> = Rc::new("hello it".to_string()); 
+let t: Rc<String> = s.clone();
+let u: Rc<String> = s.clone();
+```
+
+> A value in an Rc box is always shared and therefore always immutable.
+>
+> 翻译：Rc 中的 value 总是被共享的值，也就是说，这个 value 是「不可变的」，可读但不可写。
+
+### RefCell
+
+为了解决「内部可变」（**interior mutability** ）问题，可以使用 [RefCell](#refcell) 指针。
+
+所谓 **interior mutability** 问题**持有不可变引用又需要修改其中的 value**（而不像 [Rc](#rc) 中的值是「不可变的」）。
+
+正常来说，不能对「不变量」进行「可变引用」：
+
+```rust
+let x = 5;
+let y = &mut x; // 编译错：不能对「不变量」进行「可变引用」
+```
+
+但有时候，开发人员需要对一个不变引用中的 value 做可变（修改这个 value 的值），这时候就可以使用 [RefCell](#refcell)。
+
+例如，要实现一个 `trait`，该 `trait` 的定义如下：
+
+```rust
+pub trait Student {
+  // 用于接收老师消息，注意这里的 &self 是不可变引用
+  fn on_message(&self, msg: &str);
+}
+```
+
+`on_message` 的定义限制了 self 是「不可变」的，但我们又希望在 `on_message` 中改变。那么解决方法如下：
+
+```rust
+use std::cell::RefCell; // 从标准库中引入
+
+struct Boy {
+  messages: RefCell<Vec<String>>, // messages 的类型为 RefCell
+}
+
+impl Boy {
+  fn new() -> Boy {
+    Boy {
+      messages: RefCell::new(vec![])  // 将 vec 保存在 RefCell 中
+    }
+  }
+}
+
+impl Student for Boy {
+  fn on_message(&self, message: &str) { // self 仍然是不可变引用
+    // 在运行时借用可变引用类型的 messages
+    self.messages.borrow_mut().push(String::from(message));
+ }
+}
+```
+
+[RefCell](#refcell) 中包含一个可变引用（mut reference）。
+
+`RefCell<T>` is a generic type that contains a single value of type T. `RefCell` supports borrowing references to its `T` value：
+
+* `RefCell::new(value)`。Creates a new RefCell, **moving** value into it.
+* `ref_cell.borrow()`。Returns a `Ref<T>`, which is essentially just a **shared reference** to the value stored in ref_cell. This method **panics** if the value is already mutably borrowed
+* `ref_cell.borrow_mut()`。Returns a `RefMut<T>`, essentially a **mutable reference** to the value in ref_cell. This method **panics** if the value is already borrowed
+* `ref_cell.try_borrow(), ref_cell.try_borrow_mut()`。Work just like borrow() and borrow_mut(), but return a Result. Instead of **panics** if the value is already mutably borrowed, they return an **Err value**
+
+一个例子：
+
+```rust
+use std::cell::RefCell;
+let ref_cell: RefCell<String> = RefCell::new("hello".to_string());
+let r = ref_cell.borrow(); // ok, returns a Ref<String>
+let count = r.len(); // ok, returns "hello".len()
+assert_eq!(count, 5);
+let mut w = ref_cell.borrow_mut(); // panic: already borrowed
+w.push_str(" world");
+```
+
+其实 [RefCell](#refcell) 的使用规则和普通的「引用」基本一致，唯一的区别就是使用普通「应用」时违反规则的话，会在「编译期」给出错误提示；而使用 [RefCell](#refcell) 违背规则的话，会在运行时 **panic**。
+
+另外：
+
+> 将 `Rc<T>` 和 `RefCell<T>` 结合使用来实现一个拥有多重所有权的可变数据
+
+## array
+
+Rust 中表示内存中连续的值的序列的类型有 3 种：
+
+* Array：`[T; N]`
+* `Vector：`Vec<T>`
+* `Slice：&[T]` 和 `&mut [T]
+
+这里介绍 Array（Vector 的介绍放到后面[一节](#vector)）：
+
+* `[T; N]` 表达的是有 N 个值的数组，且该数组中的每个元素的类型是 T
+  * `[T; N]` 形态的数组必须在编译期就决定该数组的大小和类型，同时该数组的大小不能再变化
+
+> 这里也先提一下 Slice：`&[T]` 和 `&mut [T]` 表达的是另外一个内存中连续的值的序列（Array 或 Vector）的 **slice**
 
 ## collections
 
@@ -897,7 +1011,7 @@ fn main() {
     // 先定义 user1
     let user1 = User {
         email: String::from("someone@example.com"),
-        username: String::from("someusername123"),
+        username: String::from("someone123"),
         active: true,
         sign_in_count: 1,
     };
@@ -930,7 +1044,7 @@ fn main() {
     // 先定义 user1
     let user1 = User {
         email: String::from("someone@example.com"),
-        username: String::from("someusername123"),
+        username: String::from("someone123"),
         active: true,
         sign_in_count: 1,
     };
@@ -997,6 +1111,56 @@ fn main() {
 enum Option<T> {
     Some(T),
     None,
+}
+```
+
+### Patterns
+
+再重点介绍一下 Patterns。
+
+首先明确一点：相对于 Expressions **产生** values；Patterns **消费** values。
+
+Patterns 的作用对象可以是：enum，struct 或 tuple。
+
+Patterns 内部有 identifiers 的话，这些 identifiers 会成为局部变量。这些 identifiers 的 values 会被 copy 或 move 到这些局部变量。
+
+用一个例子来说明 move：
+
+```rust
+match account {
+  Account {name, language, .. } => {
+    ui.greet(&name, &language);
+    ui.show_setting(&account); // error: borrow of moved value: `account`
+  }
+}
+```
+
+上面的例子中，`account.name` 和 `account.language` 已经被 move 到 2 个局部变量中，account 然后就被 drop 掉了。所以，之后不能再 borrow account。
+
+除了 copy 和 move，也可以使用 `ref` 关键字，表示 borrow（不对 value 进行**消费**，只是 borrow）。例如：
+
+```rust
+match account {
+  Account { ref name, ref language, .. } => {
+    ui.greet(name, language); // 只 borrow，不消费
+    ui.show_setting(&account); // ok
+  }
+}
+```
+
+最后，看一个 Patterns 的应用 `while let` 表达式：
+
+```rust
+fn main()
+{
+    //gfg is a variable
+    let mut gfg = "Printing Geeks for Geeks using while let".chars();
+    // let pattern = expr（如果表达式能和这个 pattern 匹配，执行循环）
+    while let Some(x) = gfg.next() {
+        //print is a statement that is used to print characters in one line
+        print!("{}",x);
+    }
+    println!("\n");
 }
 ```
 
