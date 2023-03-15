@@ -159,31 +159,69 @@ endfunction()
 
 ## 二. C 语言相关
 
-* 从「可移植」方面来考量的话，就 C 语言中的数据来说，作为一个 programmer，应该尽可能的只关注 value 本身，而不是 value 的具体 representation
-* value 和 representation 之前的相互转换是编译器应该关注的事情
-* C 程序可以抽象成「有序抽象状态机」。「抽象状态机」相关概念包括：
-  * 所谓「有序抽象状态机」就是用来操作 values（在给定时刻，程序的变量，variable，拥有特定的 value）
-  * **value**：就是「值」的抽象概念，和具体的程序是无关的；而且 C 中的 value 都是「数值」（或者可以被转换为「数值」）
-  * **type**：C 语言中，type 是 value 的属性
-    * 所有的 value 的 type 都静态的决定；所谓的「静态类型」
-    * 在一个 value 上可以执行什么操作，由 value 的 type 决定
-    * value 上操作的结果是什么会被 type 决定（但也不能完全被 type 决定，结果也受 binary representation 的影响）
-    * 编译器是否能做一些优化，也受到 type 的影响（例如，对 unsigned int 上的操作做优化时，可以不考虑 overflow）
-  * **binary representation**：type 的二进制表示。例如对一个 16 位的 unsigned int，其二进制表示就很简单：直接用 16 位 bits 表示就行了。一般来说是具体平台无关，也是一种可抽象的概念；而 **object representation** 是和平台相关的概念，不是抽象的，具体由编译器来决定
+### 概念
 
-* **Value**：C 中，value 是抽象实体，抽象于特定的实现，和特定的运行之上。
-  * C 中，所有的 value 都是「数值」，或者可以转换为「数值」
+#### Value
 
-* **Type**：type 是所有的 value 都具有的静态属性（非运行时决定）
-  * type 决定了可以在 value 上做什么操作；type 也会对在 value 上的操作的结果造成影响
+* 从「可移植」方面来考量的话，就 C 语言中的数据来说，作为一个 programmer，应该尽可能的只关注 [value](#value) 本身，而不是 [value](#value) 的具体 **representation**
+  * C programs primarily reason about [value](#value) and **NOT** about their **representation**.
+  * 这个道理就类似现实世界中，同一个数在不同的语言（例如用罗马数字来表示数字）中有不同的表达方式，但我们关注的是数本身，而不是表达方式
 
-* **Binary Representation**：但由于各种平台的差异，C 的标准并不能完全控制所有的具体实现细节；也就是说，即使遵循了 C 标准，也不能完全保证同样的操作在所有平台上的结果完全一致。
-  * binary representation 也会对在 value 上的操作的结果造成影响
-  * 但这里的 binary representation 还是一个抽象的概念，并没有决定 value 物理上具体怎么存储的。value 物理上怎么存储的是 **object representation** 相关的概念
+* C 中，[value](#value) 是抽象实体，抽象于特定的实现，和特定的运行之上
+* [value](#value) 和 representation 之前的相互转换是编译器应该关注的事情
+* C 程序可以抽象成「有序抽象状态机」。「抽象状态机」的运行理想上是和平台无关的，「状态机」中和平台无关的相关概念包括 [value](#value)、object、[type](#type)：
+  * 所谓「有序抽象状态机」就是用来操作 [value](#value)（在给定时刻，程序的变量，variable，拥有特定的 [value](#value)）
+  * **[value](#value)**：就是「值」的抽象概念，和具体的程序是无关的；而且 C 中的 [value](#value) 都是「数值」（或者可以被转换为「数值」）
 
-* 总之，「有序状态机」状态的迁移只由 3 个东东决定：value，type，binary representation
+「状态机」状态的转换由 3 者决定： [value](#value)、[type](#type)、[Binary Representation](#binary-representation)
+
+#### Type
+
+* [type](#type)：C 语言中，[type](#type) 是 [value](#value) 的属性
+  
+  * 所有的 [value](#value) 的 [type](#type) 都静态的决定（非运行时决定）；所谓的「静态类型」
+  * 在一个 [value](#value) 上可以执行什么操作，由 [value](#value) 的 [type](#type) 决定
+  * [value](#value) 上操作的结果是什么会被 [type](#type) 决定（但也不能完全被 [type](#type) 决定，结果也受 [Binary Representation](#binary-representation) 的影响）
+  * 编译器是否能做一些优化，也受到 [type](#type) 的影响（例如，对 unsigned int 上的操作做优化时，可以不考虑 overflow）
+  
+#### Object
+
+澄清几个概念：
+
+* **[object](#object)**：可以被看成一种 box 本身
+* **identifier**：用来标识 box 的 name
+* **[type](#type)**：如果 [object](#object) 看成是 box 的话，那么 [type](#type) 就是 box 的 specification
+* **[value](#value)**：如果 [object](#object) 看成 box 的话，[value](#value) 就是放在 box 中的 content
+
+> 赋值语句可以理解为：把 value 赋值给 object（把 content 放进 box）
+
+#### Binary Representation
+
+* [Binary Representation](#binary-representation)：[type](#type) 的二进制表示。例如对一个 16 位的 unsigned int，其二进制表示就很简单：直接用 16 位 bits 表示就行了。一般来说是具体平台无关，也是一种可抽象的概念
+  * 但由于各种平台的差异，C 的标准并不能完全控制所有的具体实现细节；也就是说，即使遵循了 C 标准，也不能完全保证同样的操作在所有平台上的结果完全一致。
+  * [Binary Representation](#binary-representation) 也会对在 [value](#value) 上的操作的结果造成影响
+  * 但这里的 [Binary Representation](#binary-representation) 还是一个抽象的概念，并没有决定 [value](#value) 物理上具体怎么存储的。[value](#value) 物理上怎么存储的是 [Object Representation](#object-representation) 相关的概念
+
+举个例子：
+
+> C 标准说明了 `size_t` 这个 [type](#type) 是一个大于 0 的整数，据此可以推演出 `size_t` 这个 [type](#type) 的各种操作；但同时，由于在不同的平台上，`size_t` 的 `SIZE_MAX` 并不一样，所以在 `size_t` 上的操作结果也是和平台相关的，并不能仅仅由  [type](#type)  就决定其操作结果；和平台相关的部分需要由 [Binary Representation](#binary-representation) 来决定。
+
+总之：
+
+> 「抽象状态机」状态的转换由 3 者决定： [value](#value)、[type](#type)、[Binary Representation](#binary-representation)
+
+#### Object Representation
+
+* [Object Representation](#object-representation) 是和平台相关的概念，不是抽象的，具体由编译器来决定
+
+总之，
+
+> 「抽象状态机」状态的迁移只由 3 者决定：[value](#value)，[type](#type)，[Object Representation](#object-representation)
+
+### Tips
+
 * C 语言中，有几种类型是不能直接做**算术操作**的。所谓的 **narrow types**：unsigned char / unsigned short /  char / signed char / signed short / bool
-  * 在算术表达式中，narrow types 会被做一次 promote，成为 signed int 类型（而不是 unsigned int）；所以干脆最好不要在算术表达式中使用 narrow types
+* 在算术表达式中，narrow types 会被做一次 promote，成为 signed int 类型（而不是 unsigned int）；所以干脆最好不要在算术表达式中使用 narrow types
 * 尽量使用 unsigned 类型；同时不要在算术表达式中把 unsigned 类型和 signed 类型混用
 * C 标准中的 stdint.h 头文件里面定义了固定 size 的整数。例如：uint32_t，int32_t 等。但到了具体平台上，并不是每种这些类型都存在
 
@@ -200,8 +238,8 @@ printf("%" PRIu32 "\n", u);
 * 当不能用 pure function 解决问题时，需要使用「指针」作为函数参数来解决问题
   * pure function 就是只用值来传递参数，函数内部对参数的修改不会影响函数返回后入参的值
 * pointer 用来 hold objects 的地址。objects 的 names 就是 variables
-* 「*」号用来定义指针类型时，最好靠左：int\* p＝＆n
-* 「*」号用来「解引用」时，最好靠右：int i＝\*p
+* `*` 号用来定义指针类型时，最好靠左：`int* p ＝ ＆n`
+* `*` 号用来「解引用」时，最好靠右：`int i ＝ *p`
 * 如果一个指针指向一个 array object，那么 array object 的长度不能通过对这个指针做 sizeof 操作得到
   * 指针不是数组
   * 把指针作为函数的参数时，如果语义上这个指针是一个数组，需要也指定这个数组的长度
@@ -256,7 +294,7 @@ double double_copy(size_t len, double target[len], double const source[len]);
   * 类型为 A 的 object 的  object representation 是一个数组：unsigned char[sizeof(A)]
     * 但不要搞混了，object representation 的 char 是 unsigned char，不是 char
     * char 只能用于「字符类型」，或者「字符串类型」
-* 能不用 & 操作符（取一个 object 的地址），就不要用；引起潜在的问题（可以参考 Rust 的思想）
+* 能不用 `&` 操作符（取一个 object 的地址），就不要用；引起潜在的问题（可以参考 Rust 的思想）
 * **void\***：无类型的指针。任何对象的指针可以转换为 void*，但也会损失掉这个对象的 type 信息
   * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。还可以转回来（值能保持一致）
   * void* 还是能不用就尽量不用
