@@ -194,10 +194,40 @@ endfunction()
 * **[value](#value)**：如果 [object](#object) 看成 box 的话，[value](#value) 就是放在 box 中的 content
 
 > 赋值语句可以理解为：把 value 赋值给 object（把 content 放进 box）
+>
+> C 语言中，可能是不需要引入「左值」、「右值」的概念；没有那么复杂，直接用 object、value 的概念就行了。
+>
+> 为什么？请参考下面的讨论……
+
+C 语言里面的「左右值」的讨论：
+
+* 先不考虑 function 的场景，C 语言中的 lvalue 中的 “l” 代表的意思不是「左」的意思，是「地址可被定位」的意思：
+  * lvalue simply means an [object](#object) that has an identifiable **location** in memory
+  * 「左值」就是 [object](#object)
+  * 所谓「右值」，在 C 语言中，其实是「非左值」
+
+一个 C 语言中「非左值」的例子：
+
+```c
+typedef struct S {
+  int i;
+} S;
+
+S f() {
+  S s;
+  s.i = 123;
+  return s;
+}
+
+int main() {
+  S s;      // 这里的 s 是「左值」
+  s = f();  // 这里的 f() 就是一个「非左值」
+}
+```
 
 #### Binary Representation
 
-* [Binary Representation](#binary-representation)：[type](#type) 的二进制表示。例如对一个 16 位的 unsigned int，其二进制表示就很简单：直接用 16 位 bits 表示就行了。一般来说是具体平台无关，也是一种可抽象的概念
+* [Binary Representation](#binary-representation)：[type](#type) 的二进制表示。例如对一个 16 位的 unsigned int，其二进制表示就很简单：直接用 16 位 bits（b<sub>0</sub>, b<sub>1</sub>...b<sub>15</sub>）表示就行了。一般来说是具体平台无关，也是一种可抽象的概念
   * 但由于各种平台的差异，C 的标准并不能完全控制所有的具体实现细节；也就是说，即使遵循了 C 标准，也不能完全保证同样的操作在所有平台上的结果完全一致。
   * [Binary Representation](#binary-representation) 也会对在 [value](#value) 上的操作的结果造成影响
   * 但这里的 [Binary Representation](#binary-representation) 还是一个抽象的概念，并没有决定 [value](#value) 物理上具体怎么存储的。[value](#value) 物理上怎么存储的是 [Object Representation](#object-representation) 相关的概念
@@ -210,6 +240,11 @@ endfunction()
 
 > 「抽象状态机」状态的转换由 3 者决定： [value](#value)、[type](#type)、[Binary Representation](#binary-representation)
 
+其他一些 tips：
+
+* 尽量使用 unsiged 类型，避免可能的 UB 行为
+* 尽量使用 uint8_t, uint16_t, uint32_t……
+
 #### Object Representation
 
 * [Object Representation](#object-representation) 是和平台相关的概念，不是抽象的，具体由编译器来决定
@@ -217,6 +252,53 @@ endfunction()
 总之，
 
 > 「抽象状态机」状态的迁移只由 3 者决定：[value](#value)，[type](#type)，[Object Representation](#object-representation)
+
+### Derived data types
+
+4 种非基本类型：
+
+* 2 种组合类型
+  * Array
+  * Structure
+* 2 种非组合类型
+  * Pointer
+  * Union
+
+#### Array
+
+* Array 作为函数参数时，数组的长度信息会**丢失**，但可以使用 `static` 关键字进行说明。例如：
+
+```c
+// static 2 表示作为函数入参的数组的程度「大于等于」 2
+void swap_double(double a[static 2]) {
+  double tmp = a[0];
+  a[0] = a[1];
+  a[1] = tmp;
+}
+```
+
+* 「字符串」是最后一个元素为 0 的 char 数组。下面分别给出 2 类例子，第一类是「字符串」，第二类不是「字符串」：
+
+```c
+// 下面 4 个是字符串（最后一个元素为 0）
+char jay0[] = ”jay”;
+char jay1[] = { ”jay” };
+char jay2[] = { 'j', 'a', 'y', 0, };
+char jay3[4] = { 'j', 'a', 'y', };
+
+// 下面 2 个不是字符串
+char jay4[3] = { 'j', 'a', 'y', };
+char jay5[3] = ”jay”;
+```
+
+* 对字符串函数（例如：`strlen(s)`）使用非字符串是 UB
+
+2 种数组：**FLA** 和 **VLA**（VLA 是到了 C99 才有的）
+
+VLA 的一些特点：
+
+* VLA 没有初始化
+* VLA 不能在 function 之外定义（只能在函数内部定义使用）
 
 ### Tips
 
@@ -233,6 +315,32 @@ uint32_t u = 23;
 
 // 需要使用 PRIu32 来 printf 类型为 uint32_t 的值
 printf("%" PRIu32 "\n", u);
+```
+
+* 非 scalar 类型的初始化必须使用 `{}`。例如：
+
+```c
+double A[] = { 7.8, };
+double B[3] = { 2 * A[0], 7, 33, };
+double C[] = { [0] = 6, [3] = 1, };
+```
+
+* 上面例子中数组 C 的初始化是 **Designated Initializers**（「指定初始化」，C99 标准支持）。尽量要使用 **Designated Initializers** 可以获得更好的 robust
+
+* 另外，当不知道如何对类型 T 做初始化时，推荐使用 **Default Initializers**，`{ 0 }`。**只要不是 VLA 类型**，都可以使用 **Default Initializers**。例如：
+
+```c
+double C[] = { 0 };
+```
+
+* 「只读字符串」建议采用 `char const*const` 的形式，例如：
+
+```c
+char const*const bird[3] = { 
+  ”raven”,
+  ”magpie”,
+  ”jay”,
+};
 ```
 
 * 当不能用 pure function 解决问题时，需要使用「指针」作为函数参数来解决问题
