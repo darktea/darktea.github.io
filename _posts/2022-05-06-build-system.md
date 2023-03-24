@@ -242,7 +242,7 @@ int main() {
 
 其他一些 tips：
 
-* 尽量使用 unsiged 类型，避免可能的 UB 行为
+* 尽量使用 unsigned 类型，避免可能的 UB 行为
 * 尽量使用 uint8_t, uint16_t, uint32_t……
 
 #### Object Representation
@@ -300,7 +300,39 @@ VLA 的一些特点：
 * VLA 没有初始化
 * VLA 不能在 function 之外定义（只能在函数内部定义使用）
 
+#### Structure
+
+* 在声明 `struct` 时，使用 `typedef`，起到简化的作用（不需要每次都要加上 struct 关键字）：
+
+```c
+typedef struct toto toto;
+struct toto {
+  // ...
+};
+
+// 不需要加上 struct
+toto one;
+```
+
+* **opaque structure**：就是不在头文件里面定义 struct。只在头文件里面声明 struct，同时头文件里面的函数的声明只会使用到这个 struct 的指针。例如：
+
+```c
+typedef struct toto toto;
+
+void toto_doit(toto*, unsigned);
+```
+
+* 但是，注意，不要 typedef 指向 struct 的指针
+
+```c
+// 不要这样做
+typedef struct toto_s* toto;
+void toto_doit(toto, unsigned);
+```
+
 ### Tips
+
+#### 类型
 
 * C 语言中，有几种类型是不能直接做**算术操作**的。所谓的 **narrow types**：unsigned char / unsigned short /  char / signed char / signed short / bool
 * 在算术表达式中，narrow types 会被做一次 promote，成为 signed int 类型（而不是 unsigned int）；所以干脆最好不要在算术表达式中使用 narrow types
@@ -343,8 +375,22 @@ char const*const bird[3] = {
 };
 ```
 
+#### Function
+
+* Use `EXIT_SUCCESS` and `EXIT_FAILURE` as return values for `main` 函数
+  * 这样做为移植性考虑：`main` 函数在有的平台期望 return 一个整数，而有的平台不希望 return 值
+* 满足 2 个特性的 function 叫 **pure function**：
+  * The function has no effects other than returning a value.
+  * The function return value only depends on its parameters.
 * 当不能用 pure function 解决问题时，需要使用「指针」作为函数参数来解决问题
   * pure function 就是只用值来传递参数，函数内部对参数的修改不会影响函数返回后入参的值
+* 如果 function 除了 return 之外，还有其他方式来改变「抽象状态机」的状态，那么就不是 pure function。例如：
+  * 修改了「全局变量」
+  * 使用了 static 变量
+  * 做了 IO 操作
+
+#### 指针
+
 * pointer 用来 hold objects 的地址。objects 的 names 就是 variables
 * `*` 号用来定义指针类型时，最好靠左：`int* p ＝ ＆n`
 * `*` 号用来「解引用」时，最好靠右：`int i ＝ *p`
@@ -360,22 +406,6 @@ char const*const bird[3] = {
   * 有效位置之后的一个位置
   * 0（空值）
 * C 里面有空指针的概念，但不能使用宏 NULL 来表示空指针（有坑。目前 C 标准对宏 NULL 的规定比较松散，不严格，底层具体的实现可能和平台相关）。目前推荐的做法是把指针赋值为 0 来表示空指针
-* **opaque structure**：就是不在头文件里面定义 struct。只在头文件里面声明 struct，同时头文件里面的函数的声明只会使用到这个 struct 的指针。例如：
-
-```c
-typedef struct toto toto;
-
-void toto_doit(toto*, unsigned);
-```
-
-* 但是，注意，不要 typedef 指向 struct 的指针
-
-```c
-// 不要这样做
-typedef struct toto_s* toto;
-void toto_doit(toto, unsigned);
-```
-
 * 数组可以被退化成指针。而且一旦退化成指针后，数组的其他信息就都丢失了
 
 ```c
@@ -398,14 +428,17 @@ double double_copy(size_t len, double target[len], double const source[len]);
   * binary representation：二进制表示。signed int 就是 b31, b30, ... b7, ... b0（32 个bits，4 个 bytes）
   * object representation：C 中所有的 object 都可以用 unsigned char 来表示。如果在一个小端系统中，上面的 binary representation 对应的 object representation 就是 unsigned char[4] 数组，且该数组的 [0] 是最高位，[3] 是最低位（小端系统）
 * 总之，C 对 object 的内存模型做了以下规定：
-  * sizeof(char) 为 1（包括 3 种 char：unsigned char，signed char 和 char）
-  * 类型为 A 的 object 的  object representation 是一个数组：unsigned char[sizeof(A)]
+  * `sizeof(char)` 为 1（包括 3 种 char：unsigned char，signed char 和 char）
+  * 类型为 A 的 object 的  object representation 是一个数组：`unsigned char[sizeof(A)]`
     * 但不要搞混了，object representation 的 char 是 unsigned char，不是 char
     * char 只能用于「字符类型」，或者「字符串类型」
 * 能不用 `&` 操作符（取一个 object 的地址），就不要用；引起潜在的问题（可以参考 Rust 的思想）
-* **void\***：无类型的指针。任何对象的指针可以转换为 void*，但也会损失掉这个对象的 type 信息
+* `void *`：无类型的指针。任何对象的指针可以转换为 `void*`，但也会损失掉这个对象的 type 信息
   * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。还可以转回来（值能保持一致）
-  * void* 还是能不用就尽量不用
+  * `void*` 还是能不用就尽量不用
+
+#### 其他
+
 * cast：**不要用 cast**，坑巨多
 * Effective Type：对 object 的 access 进行限制。关键点如下：
   * Objects must be accessed through their **effective type** or through a pointer to a character type
