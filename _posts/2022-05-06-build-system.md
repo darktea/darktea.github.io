@@ -277,6 +277,7 @@ void swap_double(double a[static 2]) {
 }
 ```
 
+* `void func(double a[static 7]);` 中的 `static 7` 标明 func 的参数是一个至少包含 7 个元素的数组（或指针）
 * 「字符串」是最后一个元素为 0 的 char 数组。下面分别给出 2 类例子，第一类是「字符串」，第二类不是「字符串」：
 
 ```c
@@ -299,6 +300,12 @@ VLA 的一些特点：
 
 * VLA 没有初始化
 * VLA 不能在 function 之外定义（只能在函数内部定义使用）
+
+VLA 的一个声明：
+
+```c
+ void func(size_t n, double a[n]);
+```
 
 #### Structure
 
@@ -405,6 +412,7 @@ char const*const bird[3] = {
   * 有效的 object
   * 有效位置之后的一个位置
   * 0（空值）
+* 总之，对一个 pointer 做 dereferenced 时，这个 pointer 指向的 object 必须有效，同时这个 pointer 指向的 object 的 type 必须是明确的（**designated type**）
 * C 里面有空指针的概念，但不能使用宏 NULL 来表示空指针（有坑。目前 C 标准对宏 NULL 的规定比较松散，不严格，底层具体的实现可能和平台相关）。目前推荐的做法是把指针赋值为 0 来表示空指针
 * 数组可以被退化成指针。而且一旦退化成指针后，数组的其他信息就都丢失了
 
@@ -422,29 +430,26 @@ int* p = &A[0];
 double double_copy(size_t len, double target[len], double const source[len]);
 ```
 
-* 再澄清一下几个概念
-  * semantic type：也就是语义上的类型。例如 int32_t（即 32 位的整数）
-  * basic type：C 语言中的基本类型。例如 signed int（事实上 int32_t 是用 typedef 到 signed int）
-  * binary representation：二进制表示。signed int 就是 b31, b30, ... b7, ... b0（32 个bits，4 个 bytes）
-  * object representation：C 中所有的 object 都可以用 unsigned char 来表示。如果在一个小端系统中，上面的 binary representation 对应的 object representation 就是 unsigned char[4] 数组，且该数组的 [0] 是最高位，[3] 是最低位（小端系统）
-* 总之，C 对 object 的内存模型做了以下规定：
-  * `sizeof(char)` 为 1（包括 3 种 char：unsigned char，signed char 和 char）
-  * 类型为 A 的 object 的  object representation 是一个数组：`unsigned char[sizeof(A)]`
-    * 但不要搞混了，object representation 的 char 是 unsigned char，不是 char
-    * char 只能用于「字符类型」，或者「字符串类型」
 * 能不用 `&` 操作符（取一个 object 的地址），就不要用；引起潜在的问题（可以参考 Rust 的思想）
 * `void *`：无类型的指针。任何对象的指针可以转换为 `void*`，但也会损失掉这个对象的 type 信息
   * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。还可以转回来（值能保持一致）
   * `void*` 还是能不用就尽量不用
 
-#### 其他
+* `restrict` 关键字：用 restrict 修饰指针类型告诉「编译器」两个指针不指向同一数据（开发人员保证）。也就是该指针只会指向一个 object，不会 aliasing 其他对象
+  * **Pointer aliasing**：是指两个或以上的指针指向同一数据
 
-* cast：**不要用 cast**，坑巨多
-* Effective Type：对 object 的 access 进行限制。关键点如下：
-  * Objects must be accessed through their **effective type** or through a pointer to a character type
-    * union 是个例外：Any member of an object that has an effective union type can be accessed at any time, provided the byte representation amounts to a valid value of the access type
-  * The effective type of a variable or compound literal is the type of its declaration
-* Files that are written in binary mode (fread, fwrite) are **not portable** between platforms
+一个例子：
+
+```c
+// memcpy 的定义使用了 restrict
+void* memcpy(void*restrict s1, void const*restrict s2, size_t n);
+
+// 而 memmove 不能使用 restrict（可能发生 Pointer aliasing）
+void* memmove(void* s1, const void* s2, size_t n);
+```
+
+#### inline
+
 * C99 引入了 inline 关键字：
   * A function definition that is declared with inline can be used in several TUs without causing a multiple-symbol-definition error
   * All pointers to the same inline function will compare as equal, even if obtained in different TUs
@@ -479,4 +484,25 @@ toto* toto_init(toto* toto_x) {
 // Instantiate in exactly one TU.
 // The parameter name is omitted to avoid macro replacement.
 toto* toto_init(toto*);
+
 ```
+
+#### 其他
+
+* 再澄清一下几个概念
+  * semantic type：也就是语义上的类型。例如 int32_t（即 32 位的整数）
+  * basic type：C 语言中的基本类型。例如 signed int（事实上 int32_t 是用 typedef 到 signed int）
+  * binary representation：二进制表示。signed int 就是 b31, b30, ... b7, ... b0（32 个bits，4 个 bytes）
+  * object representation：C 中所有的 object 都可以用 unsigned char 来表示。如果在一个小端系统中，上面的 binary representation 对应的 object representation 就是 unsigned char[4] 数组，且该数组的 [0] 是最高位，[3] 是最低位（小端系统）
+* 总之，C 对 object 的内存模型做了以下规定：
+  * `sizeof(char)` 为 1（包括 3 种 char：unsigned char，signed char 和 char）
+  * 类型为 A 的 object 的  object representation 是一个数组：`unsigned char[sizeof(A)]`
+    * 但不要搞混了，object representation 的 char 是 unsigned char，不是 char
+    * char 只能用于「字符类型」，或者「字符串类型」
+
+* cast：**不要用 cast**，坑巨多
+* Effective Type：对 object 的 access 进行限制。关键点如下：
+  * Objects must be accessed through their **effective type** or through a pointer to a character type
+    * union 是个例外：Any member of an object that has an effective union type can be accessed at any time, provided the byte representation amounts to a valid value of the access type
+  * The effective type of a variable or compound literal is the type of its declaration
+* Files that are written in binary mode (fread, fwrite) are **not portable** between platforms
