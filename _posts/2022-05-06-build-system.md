@@ -337,6 +337,75 @@ typedef struct toto_s* toto;
 void toto_doit(toto, unsigned);
 ```
 
+### 线程
+
+本节介绍 C11 标准里使用[线程](#线程)时会用到的几个基本库函数：
+
+```c
+#include <threads.h>
+typedef int (*thrd_start_t)(void*);
+
+/*
+ * thrd_create 的 3 个入参说明如下：
+ * thrd_t*：线程创建成功后的线程 id
+ * thrd_start_t：线程执行的函数
+ * void* 需要传入给线程的数据
+ */
+int thrd_create(thrd_t*, thrd_start_t, void*);
+
+int thrd_join(thrd_t, int *);
+```
+
+一般的使用方法：
+
+* 在 `main` 函数中，使用 `thrd_create` 函数对不同的任务创建相应的线程
+* 然后在 `main` 函数中使用 `thrd_join` 对这些[线程](#线程)做 `join`，等待这些[线程](#线程)的结束
+* 同时，某个[线程](#线程)执行其对应的 `thrd_start_t` 函数，直到这个函数 `return`，该[线程](#线程)的工作结束
+
+一个简单的例子：
+
+```c
+/* 先准备好需要提供给线程的数据：
+   Create an object that holds the game's data. */
+life L = LIFE_INITIALIZER;
+life_init(&L, n0, n1, M);
+
+/* Creates four threads that all operate on that same object
+   and collects their IDs in ”thrd” */
+thrd_t thrd[4];
+thrd_create(&thrd[0], update_thread, &L);
+thrd_create(&thrd[1], draw_thread, &L);
+thrd_create(&thrd[2], input_thread, &L);
+thrd_create(&thrd[3], account_thread, &L);
+
+/* Waits for the update thread to terminate */
+thrd_join(thrd[0], 0);
+
+/* Tells everybody that the game is over */
+L.finished = true;
+ungetc('q', stdin);
+
+/* Waits for the other threads */
+thrd_join(thrd[1], 0);
+thrd_join(thrd[2], 0);
+thrd_join(thrd[3], 0);
+
+// 只有当这 4 个线程都结束时，main 函数才会结束
+```
+
+使用线程的要点：
+
+* 如果某个[线程](#线程)对一个「非原子」变量进行了写操作，那么其他[线程](#线程)**同时**对这个变量的「读写操作」会导致[线程](#线程)执行的 UB（未定义行为）
+* 使用 `_Atomic(T)` 语法定义「原子」变量。具体用法参考文档，这里只给简单的例子：
+
+```c
+ // 不能作用到数组上。Invalid: atomic cannot be applied to arrays.
+_Atomic(double[45]) C;
+
+// Valid: atomic can be applied to array base.
+_Atomic(double) D[45];
+```
+
 ### Tips
 
 #### 类型
