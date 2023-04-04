@@ -9,6 +9,7 @@ tags: [rust]
 * [ownership](#ownership)
 * [move](#move)
 * [borrowing](#borrowing)
+* [copy](#copy)
 * [references](#references)
 * [lifetime](#lifetime)
   * [函数定义使用生命周期注解](#函数定义使用生命周期注解)
@@ -19,6 +20,7 @@ tags: [rust]
   * [RefCell](#refcell)
 * [collections](#collections)
   * [vector](#vector)
+  * [slices](#slices)
   * [hash map](#hash-map)
   * [String](#string)
   * [string slice](#string-slice)
@@ -264,6 +266,16 @@ fn change(some_string: &mut String) {
 >
 > (*some_string) = String::from("new string it");
 
+## copy
+
+默认是 copy 而不是 move 的类型有：
+
+* integer
+* floating-point numeric
+* char
+* bool
+* A tuple or fixed-size array of Copy types is itself a Copy type
+
 ## references
 
 * **定义**：The &s1 syntax lets us create a reference that refers to the value of s1 but does not own it
@@ -341,6 +353,22 @@ fn main() {
 > 总之：
 >
 > owner 和 可变引用的根本区别就在于 owner 会负责值的 drop（释放）；这个区别也就决定了一旦值上存在引用，就要小心的使用 owner，要保证这个值要始终有效，不要被释放，否则 Rust 的编译器会提示失败。
+
+另外，Rust 中，可以「引用」到任意的表达式，包括「值」，例如：
+
+```rust
+fn factorial(n: usize) -> usize {
+    (1..n+1).product()
+}
+
+let r = &factorial(6);
+
+// Arithmetic operators can see through one level of references. 
+// 可以是 r + &1009 这种形式
+assert_eq!(r + &1009, 1729);
+```
+
+上面的例子中，Rust 会创建一个「匿名变量」来 hold 这个表达式的「值」，然后让这个「引用」指向这个「匿名变量」，而这个「匿名变量」也有它自己的[生命周期](#lifetime)。
 
 ## lifetime
 
@@ -597,6 +625,8 @@ Rust 中表示内存中连续的值的序列的类型有 3 种：
 * `Vector：`Vec<T>`
 * `Slice：&[T]` 和 `&mut [T]
 
+> 这 3 种形式中 `v[i]` 都代表的是第 i 个元素。
+
 这里介绍 Array（Vector 的介绍放到后面[一节](#vector)）：
 
 * `[T; N]` 表达的是有 N 个值的数组，且该数组中的每个元素的类型是 T
@@ -621,11 +651,26 @@ Rust 中表示内存中连续的值的序列的类型有 3 种：
 fn main() {
 // 使用 vec! macro
     let mut primes = vec![2, 3, 5, 7];
+    // 变长
+    let mut z = vec![0; rows * cols];
 
 // 使用 Vec::new
     let mut pal = Vec::new();
     pal.push("step");
+
+// 使用 iterator
+    let v: Vec<i32> = (0..5).collect();
+    assert_eq!(v, [0, 1, 2, 3, 4]);
 }
+```
+
+* 容量不等于 vector 的当前面 size：
+
+```rust
+// capacity 是 2，但 size 是 0
+let mut v = Vec::with_capacity(2); 
+assert_eq!(v.len(), 0); 
+assert_eq!(v.capacity(), 2);
 ```
 
 * 两种方法获取 vector 中的某个元素
@@ -677,6 +722,55 @@ fn main() {
 ```
 
 总之，Rust 必须在编译期确定 vector 中的数据的类型。
+
+### slices
+
+slice（`[T]`）是 array 或 vector 中的一部分；可能是 array，也可能是 vector，总之是一段**连续**的数据的[引用](#references)。
+
+最后再说一下数组的 move
+
+数组（或 vector）中的元素是不能被 move 的：
+
+```rust
+// Build a vector of the strings "101", "102", ... "105"
+let mut v = Vec::new();
+for i in 101..106 {
+    v.push(i.to_string());
+}
+
+// 错：Pull out random elements from the vector.
+let third = v[2]; // error: Cannot move out of index of Vec
+let fifth = v[4]; // here too
+```
+
+如果要对数组（或 vector）中的元素做 move，需要专门的函数，例如：`pop`、`swap_remove`、`std::mem::replace`……
+
+另外，把数组（或 vector）中的元素 move 出来也叫做 **consume** （消费）。例如，对 vector 中的所有元素进行「消费」：
+
+```rust
+let v = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()];
+
+for mut s in v {
+  s.push('!');
+  println!("{}", s);
+}
+```
+
+上面的循环中，把 `v` 中的元素逐个 **move** 给 s，每次 s 拥有 v 的元素，并进行操作。
+
+最后看一个技巧：
+
+```rust
+// 数组中元素中有 Option
+struct Person { name: Option<String>, birth: i32 }
+
+let mut composers = Vec::new();
+composers.push(Person { name: Some("Palestrina".to_string()),
+                            birth: 1525 });
+
+// 用 take 方法把 Option 的值 move 出来，而数组中留下一个 None
+let first_name = composers[0].name.take();
+```
 
 ### hash map
 
