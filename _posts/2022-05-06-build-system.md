@@ -500,10 +500,11 @@ double double_copy(size_t len, double target[len], double const source[len]);
 ```
 
 * 能不用 `&` 操作符（取一个 object 的地址），就不要用；引起潜在的问题（可以参考 Rust 的思想）
-* `void *`：无类型的指针。任何对象的指针可以转换为 `void*`，但也会损失掉这个对象的 type 信息
-  * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。还可以转回来（值能保持一致）
+* `void *`：无类型的指针。任何对象的指针**无需强转就**可以转换为 `void*`，但也会损失掉这个对象的 type 信息
+  * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。在用强转回来以后，还能恢复原先的类型和数据（值能保持一致）
+  * 一种常见的做法是：函数的入参是一个 `void*` 参数和一个 `size_t` 的参数，这样的话，代表该函数要对一段固定长度（`size_t` 为单位）的内存做操作，而不关心这段内存中的数据的类型（例如：memcpy 和 memset）
   * `void*` 还是能不用就尽量不用
-
+  
 * `restrict` 关键字：用 restrict 修饰指针类型告诉「编译器」两个指针不指向同一数据（开发人员保证）。也就是该指针只会指向一个 object，不会 aliasing 其他对象
   * **Pointer aliasing**：是指两个或以上的指针指向同一数据
 
