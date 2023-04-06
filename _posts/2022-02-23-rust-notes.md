@@ -496,6 +496,8 @@ struct S<'a, 'b> {
 
 ## pointers
 
+> 实际上，Rust 中的 Smart Points（以及[常用 Traits](#traits)）就是给开发人员提供了 Rust 中一些惯用模式。
+
 Rust 中的指针有 3 种：
 
 * 【引用】：Rust 中安全的指针。也就是【非所有权指针】，分 &T 和 &mut T 两种。其中 &T 本身是一种 Copy 类型；而 &mut T 并没有实现 Copy Trait（Copy **trait** 的细节请参考其他小节）
@@ -521,6 +523,30 @@ fn main() {
 
     let x2 = x; // 能通过生命周期检查
     let y2 = y; // 不能通过生命周期检查，因为 y 已经被释放
+}
+```
+
+既然 [Box](#box) 用于把数据存储在「堆」（heap）上，那么 [Box](#box) 常常被使用在以下场景：
+
+* 在编译时，无法确认数据 size 的场景
+* 不关心当前「对象」具体的「类型」，而是只关心它实现了什么 [Trait](#traits)
+
+下面是一个例子：
+
+```rust
+// 错：这个定义是不能通过编译的。因为 List 的这个定义是递归的，在编译期间不能决定 List 的 size
+enum List{
+  Cons(i32, List),
+  Nil,
+}
+```
+
+改用 Box 可通过编译：
+
+```rust
+enum List{
+  Cons(i32, Box<List>),
+  Nil,
 }
 ```
 
