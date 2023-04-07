@@ -358,10 +358,10 @@ fn main() {
 
 ```rust
 fn factorial(n: usize) -> usize {
-    (1..n+1).product()
+    (1..n + 1).product()
 }
 
-let r = &factorial(6);
+let r = & factorial(6);
 
 // Arithmetic operators can see through one level of references. 
 // 可以是 r + &1009 这种形式
@@ -535,18 +535,18 @@ fn main() {
 
 ```rust
 // 错：这个定义是不能通过编译的。因为 List 的这个定义是递归的，在编译期间不能决定 List 的 size
-enum List{
-  Cons(i32, List),
-  Nil,
+enum List {
+    Cons(i32, List),
+    Nil,
 }
 ```
 
 改用 Box 可通过编译：
 
 ```rust
-enum List{
-  Cons(i32, Box<List>),
-  Nil,
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
 }
 ```
 
@@ -557,18 +557,18 @@ enum List{
 ```rust
 #![allow(unused)]
 
-enum List{
-  Cons(i32, Box<List>),
-  Nil,
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
 }
 
 fn main() {
-  let a = Cons(5, Box::new(Cons(10, Box::new(Nil))));
-  // b 获取到了 a 的「所有权」
-  let b = Cons(3, a);
-  
-  // 错：这里不能通过编译，a 的「所有权」已经被 b 占有
-  let c = Cons(4, a);
+    let a = Cons(5, Box::new(Cons(10, Box::new(Nil))));
+    // b 获取到了 a 的「所有权」
+    let b = Cons(3, a);
+
+    // 错：这里不能通过编译，a 的「所有权」已经被 b 占有
+    let c = Cons(4, a);
 }
 ```
 
@@ -576,20 +576,21 @@ fn main() {
 
 ```rust
 #![allow(unused)]
+
 use std::rc::Rc;
 
-enum List{
-  Cons(i32, Rc<List>),
-  Nil,
+enum List {
+    Cons(i32, Rc<List>),
+    Nil,
 }
 
 fn main() {
-  let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
-  // b 获取到了 a 的「所有权」，引用计数 +1
-  let b = Cons(3, Rc::clone(&a));
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    // b 获取到了 a 的「所有权」，引用计数 +1
+    let b = Cons(3, Rc::clone(&a));
 
-  // c 也获取到了 a 的「所有权」，引用计数 +1
-  let c = Cons(4, Rc::clone(&a));
+    // c 也获取到了 a 的「所有权」，引用计数 +1
+    let c = Cons(4, Rc::clone(&a));
 }
 ```
 
@@ -597,9 +598,9 @@ fn main() {
 
 ```Rust
 use std::rc::Rc;
-    
+
 // Rust can infer all these types; written out for clarity
-let s: Rc<String> = Rc::new("hello it".to_string()); 
+let s: Rc<String> = Rc::new("hello it".to_string());
 let t: Rc<String> = s.clone();
 let u: Rc<String> = s.clone();
 ```
@@ -618,7 +619,7 @@ let u: Rc<String> = s.clone();
 
 ```rust
 let x = 5;
-let y = &mut x; // 编译错：不能对「不变量」进行「可变引用」
+let y = & mut x; // 编译错：不能对「不变量」进行「可变引用」
 ```
 
 但有时候，开发人员需要对一个不变引用中的 value 做可变（修改这个 value 的值），这时候就可以使用 [RefCell](#refcell)。
@@ -627,8 +628,8 @@ let y = &mut x; // 编译错：不能对「不变量」进行「可变引用」
 
 ```rust
 pub trait Student {
-  // 用于接收老师消息，注意这里的 &self 是不可变引用
-  fn on_message(&self, msg: &str);
+    // 用于接收老师消息，注意这里的 &self 是不可变引用
+    fn on_message(&self, msg: &str);
 }
 ```
 
@@ -638,22 +639,22 @@ pub trait Student {
 use std::cell::RefCell; // 从标准库中引入
 
 struct Boy {
-  messages: RefCell<Vec<String>>, // messages 的类型为 RefCell
+    messages: RefCell<Vec<String>>, // messages 的类型为 RefCell
 }
 
 impl Boy {
-  fn new() -> Boy {
-    Boy {
-      messages: RefCell::new(vec![])  // 将 vec 保存在 RefCell 中
+    fn new() -> Boy {
+        Boy {
+            messages: RefCell::new(vec![])  // 将 vec 保存在 RefCell 中
+        }
     }
-  }
 }
 
 impl Student for Boy {
-  fn on_message(&self, message: &str) { // self 仍然是不可变引用
-    // 在运行时借用可变引用类型的 messages
-    self.messages.borrow_mut().push(String::from(message));
- }
+    fn on_message(&self, message: &str) { // self 仍然是不可变引用
+        // 在运行时借用可变引用类型的 messages
+        self.messages.borrow_mut().push(String::from(message));
+    }
 }
 ```
 
@@ -735,8 +736,8 @@ fn main() {
 
 ```rust
 // capacity 是 2，但 size 是 0
-let mut v = Vec::with_capacity(2); 
-assert_eq!(v.len(), 0); 
+let mut v = Vec::with_capacity(2);
+assert_eq!(v.len(), 0);
 assert_eq!(v.capacity(), 2);
 ```
 
@@ -802,7 +803,7 @@ slice（`[T]`）是 array 或 vector 中的一部分；可能是 array，也可�
 // Build a vector of the strings "101", "102", ... "105"
 let mut v = Vec::new();
 for i in 101..106 {
-    v.push(i.to_string());
+v.push(i.to_string());
 }
 
 // 错：Pull out random elements from the vector.
@@ -818,8 +819,8 @@ let fifth = v[4]; // here too
 let v = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()];
 
 for mut s in v {
-  s.push('!');
-  println!("{}", s);
+s.push('!');
+println!("{}", s);
 }
 ```
 
@@ -829,11 +830,14 @@ for mut s in v {
 
 ```rust
 // 数组中元素中有 Option
-struct Person { name: Option<String>, birth: i32 }
+struct Person {
+    name: Option<String>,
+    birth: i32
+}
 
 let mut composers = Vec::new();
 composers.push(Person { name: Some("Palestrina".to_string()),
-                            birth: 1525 });
+birth: 1525 });
 
 // 用 take 方法把 Option 的值 move 出来，而数组中留下一个 None
 let first_name = composers[0].name.take();
@@ -1293,10 +1297,10 @@ Patterns 内部有 identifiers 的话，这些 identifiers 会成为局部变量
 
 ```rust
 match account {
-  Account {name, language, .. } => {
-    ui.greet(&name, &language);
-    ui.show_setting(&account); // error: borrow of moved value: `account`
-  }
+Account {name, language, ..} => {
+ui.greet( & name, & language);
+ui.show_setting( & account); // error: borrow of moved value: `account`
+}
 }
 ```
 
@@ -1306,10 +1310,10 @@ match account {
 
 ```rust
 match account {
-  Account { ref name, ref language, .. } => {
-    ui.greet(name, language); // 只 borrow，不消费
-    ui.show_setting(&account); // ok
-  }
+Account { ref name, ref language, .. } => {
+ui.greet(name, language); // 只 borrow，不消费
+ui.show_setting( & account); // ok
+}
 }
 ```
 
@@ -1323,7 +1327,7 @@ fn main()
     // let pattern = expr（如果表达式能和这个 pattern 匹配，执行循环）
     while let Some(x) = gfg.next() {
         //print is a statement that is used to print characters in one line
-        print!("{}",x);
+        print!("{}", x);
     }
     println!("\n");
 }
@@ -3780,15 +3784,15 @@ struct 的生命周期请参考：[结构体的生命周期注解](#结构体的
 
 ```rust
 // Fat pointers to slices carry their referent's length.
-let slice: &[i32] = &[1, 3, 9, 27, 81];
+let slice: & [i32] = & [1, 3, 9, 27, 81];
 assert_eq!(std::mem::size_of_val(slice), 20);
 
-let text: &str = "alligator";
+let text: & str = "alligator";
 assert_eq!(std::mem::size_of_val(text), 9);
 
 use std::fmt::Display;
-let unremarkable: &dyn Display = &193_u8;
-let remarkable: &dyn Display = &0.0072973525664;
+let unremarkable: & dyn Display = & 193_u8;
+let remarkable: & dyn Display = & 0.0072973525664;
 
 // These return the size/alignment of the value the
 // trait object points to, not those of the trait object
