@@ -552,7 +552,48 @@ enum List{
 
 ### Rc
 
-使用 Rc 的例子：
+如果上一节例子中的某个 List 节点被多个 List 指向怎么办？如果还是使用 [Box](#box) 指针不能通过编译：
+
+```rust
+#![allow(unused)]
+
+enum List{
+  Cons(i32, Box<List>),
+  Nil,
+}
+
+fn main() {
+  let a = Cons(5, Box::new(Cons(10, Box::new(Nil))));
+  // b 获取到了 a 的「所有权」
+  let b = Cons(3, a);
+  
+  // 错：这里不能通过编译，a 的「所有权」已经被 b 占有
+  let c = Cons(4, a);
+}
+```
+
+这种场景需要使用 Rc（单个 value 可以有多个 owners）：
+
+```rust
+#![allow(unused)]
+use std::rc::Rc;
+
+enum List{
+  Cons(i32, Rc<List>),
+  Nil,
+}
+
+fn main() {
+  let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+  // b 获取到了 a 的「所有权」，引用计数 +1
+  let b = Cons(3, Rc::clone(&a));
+
+  // c 也获取到了 a 的「所有权」，引用计数 +1
+  let c = Cons(4, Rc::clone(&a));
+}
+```
+
+其他使用 Rc 的例子：
 
 ```Rust
 use std::rc::Rc;
