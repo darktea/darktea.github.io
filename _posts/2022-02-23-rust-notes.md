@@ -596,7 +596,7 @@ fn main() {
 
 其他使用 Rc 的例子：
 
-```Rust
+```rust
 use std::rc::Rc;
 
 // Rust can infer all these types; written out for clarity
@@ -865,7 +865,7 @@ fn main() {
 
 利用 vector 的 zip 方法在初始化时创建 HashMap：
 
-```Rust
+```rust
 use std::collections::HashMap;
 
 fn main() {
