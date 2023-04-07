@@ -929,6 +929,8 @@ fn main() {
 fn main() {
     let s1 = String::from("Hello, ");
     let s2 = String::from("world!");
+
+    // s1 会被 move，失去「所有权」
     let s3 = s1 + &s2; // Note s1 has been moved here and can no longer be used
 }
 ```
@@ -970,7 +972,9 @@ fn main() {
 }
 ```
 
-* Rust 专门有一个 string slice（&str）类型来表达 string literals：a reference to part of a String。
+> 注意：在编译期间不知道 String 类型的 size；而 &str 的 size 在编译期间已知
+
+* Rust 专门有一个 string slice（&str）类型来表达 string literals：a reference to part of a String
 
 举个例子：
 
@@ -993,7 +997,7 @@ fn first_word(s: &String) -> &str {
 ```
 
 * 但在处理字符串时，尽量不要牵涉到 **byte** 操作，而是要尽量用**字符**相关的操作
-  * 因为 Rust 中的字符是 UTF-8 编码，一个 UTF-8 编码的字符有几个 bytes 是不确定的
+  * 因为 Rust 中的字符是 UTF-8 编码，一个 UTF-8 编码的字符有几个 bytes 是不确定的。而且也是因为这个「不确定」，要获取 String 的某个 UTF-8 字符，只能是遍历整个 String：
 
 利用 chars 来遍历字段串的例子：
 
