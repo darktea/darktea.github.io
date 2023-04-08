@@ -1970,7 +1970,12 @@ trait Copy: Clone {}
 
 ### Deref and DerefMut
 
-先回顾一下 Rust 中的「**解引用**」操作符号 * 的用法：
+Deref 和 DerefMut 主要的用途有 2 个：
+
+1. 给自定义的类型提供类似 Rust「原生」的「解引用」操作
+2. **deref coercions**，也就是可以实现「自动的」把一个类型的「引用」转换」成另外一个类型的「引用」
+
+先看「解引用」，回顾一下 Rust 中的「**解引用**」操作符号 `*` 的用法：
 
 ```rust
 fn main() {
@@ -1983,11 +1988,7 @@ fn main() {
 }
 ```
 
-通过实现 std::ops::Deref 和 std::ops::DerefMut 这 2 个 trait 来定义 * 这个「**解引用**」操作符号。例如：
-
-* `Box<T>` 实现了 Deref 和 DerefMut。那么对于 `Box<T>` 的一个值 b，那么 *b 就是 refer to T 的值
-
-给个例子：
+通过实现 std::ops::Deref 和 std::ops::DerefMut 这 2 个 trait 来实现「自定义」类型的 `*` 「**解引用**」操作符号。例如 `Box<T>` 实现了 Deref 和 DerefMut，就可以如下使用：
 
 ```rust
 fn main() {
@@ -2005,20 +2006,100 @@ Deref 和 DerefMut 这 2 个 trait 大概定义如下：
 ```rust
 trait Deref {
     type Target: ?Sized;
+    // 注意：这里返回的是一个「引用」
     fn deref(&self) -> &Self::Target;
 }
 
 trait DerefMut: Deref {
+    // 注意：这里返回的是一个「引用」
     fn deref_mut(&mut self) -> &mut Self::Target;
 }
 ```
 
-* 其中，Target 是可以通过 Self 拿到的返回，同时 2 者生命周期保持一致
+* 其中，通过 self 可以拿到（own 这个值，或者有这个值的「引用」）类型为 Target 的值，而且 deref 会返回这个值的「引用」，同时 2 者生命周期保持一致
 * 而且，DerefMut 需要实现 Deref
-* **deref coercions**: one type is being “coerced” into behaving as another。也就是自动类型转换，例如：
-  * `Rc<T>` 实现了 `Deref<Target=T>`。所以 `Rc<String>` 的值 r：r.find('?') 等价于 (*r).find('?')
-  * String 实现了 Deref<Target=str>。所以可以 coerce 一个 &String 的值到 &str
-  * `Vec<T>` 实现了 Deref<Target=[T]>。所以可以把 bytes vector 传给一个入参是 slice &[u8] 的函数
+
+给一个 Box 的对 Deref 实现的例子：
+
+```rust
+use std::ops::Deref;
+
+struct MyBox<T>(T);
+
+impl<T> MyBox<T> {
+    fn new(x: T) -> MyBox<T> {
+        MyBox(x)
+    }
+}
+
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+
+    // 注意，这里返回的是 Target 的引用
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+fn main() {
+    let x = 5;
+    let y: MyBox<i32> = MyBox::new(x);
+
+    assert_eq!(5, x);
+    assert_eq!(5, *y);
+}
+```
+
+再看一下 **deref coercions**。
+
+**deref coercions**：one type is being “coerced” into behaving as another。也就是自动把一个类型的「引用」转换为另外一个类型的「引用」。
+
+简单点说，如果实现了 Defer（入参是 &self，返回是 &Self::Target），就有了自动 &U 转换为 &T 的效果。如果 Rust 发现当前使用 &U 会编译失败，需要 &T 才能编译通过；同时又发现该类型 U 提供的 Deref 实现了 &U 到 &T，Rust 就会自动做这种转换。例如：
+
+* `Rc<T>` 实现了 `Deref<Target=T>`。对 `Rc<String>`，如果要调用 `String::find` 方法，`r.find('?')` 可以通过编译（等价于 `(*r).find('?')`）
+  * Rust 自动做了转换：&Rc -> &String
+* `String` 实现了 `Deref<Target=str>`。所以可以 coerce 一个 `&String` 的值到 `&str`
+* `Vec<T>` 实现了 Deref<Target=[T]>。所以可以把 bytes vector 传给一个入参是 slice &[u8] 的函数
+
+最后还是给一个 MyBox 的例子：
+
+```rust
+use std::ops::Deref;
+
+struct MyBox<T>(T);
+
+impl<T> MyBox<T> {
+    fn new(x: T) -> MyBox<T> {
+        MyBox(x)
+    }
+}
+
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+
+    // 注意，这里返回的是 Target 的引用
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+fn main() {
+    let x = 5;
+    let y: MyBox<i32> = MyBox::new(x);
+
+    assert_eq!(5, x);
+    assert_eq!(5, *y);
+
+    let m = MyBox::new(String::from("hello it"));
+
+    // &MyBox<String> -> &String -> &str
+    hello(&m);
+}
+
+fn hello(name: &str) {
+    println!("OK, {}!", name);
+}
+```
 
 ### Default
 
