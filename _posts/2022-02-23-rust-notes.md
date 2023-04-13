@@ -61,7 +61,7 @@ tags: [rust]
 * [closure](#closure)
 * [Iterator](#iterator)
   * [概念](#概念)
-  * [创建 iterator](#创建-iterator)
+  * [获取 iterator](#获取-iterator)
   * [使用 iterator](#使用-iterator)
 * [macros](#macros)
   * [macro rules](#macro-rules)
@@ -79,7 +79,7 @@ tags: [rust]
 * 静态语言：编译时就要知道所有变量的类型
 * 标量：整型（有符号和无符号都支持），浮点（f32 和 f64），布尔，字符（注意：不是字符串）
 * 复合类型：tup, array（stack上，固定长度）
-* 字符串常量（string literal）vs. String 类型：前者在栈上（运行期不可变），后者在堆上（运行期可变）
+* 字符串常量（[string literal](#string-slice)）vs. [String](#string) 类型：前者在栈上？（运行期不可变），后者在堆上（运行期可变）
 * const 和 变量的区别：
   * const 是编译期可决定的值（或表达式）
   * 可以在函数之外定义一个 const，在 module 的范围内使用这个 const
@@ -3396,7 +3396,16 @@ fn main() {
 
 ### 概念
 
-先看一个 for 循环的例子：
+先明确几个概念：
+
+* 所谓 [Iterator](#iterator) 就是实现了 `Iterator` trait 的「类型」。
+* 「某个类型可迭代」（**iterable**）就是指该类型实现了 `IntoIterator`，也就是对这个「类型」可以通过 `into_iter` 方法获取到「该类型对应的 iterator」。从而可以通过  [Iterator](#iterator) 来做遍历操作
+  * [Iterator](#iterator) 生产（produces）「值」
+  * 获取到  [Iterator](#iterator) 生产（produces）的「值」的代码就是「消费者」（consumer）
+
+> for 循环会自动调用「可迭代类型」的 into_iter 获取 iterator；不过也可以直接把一个 iterator 给 for 循环语句：iterator 本身也可以被调用 into_iter 方法（返回 iterator 自己）
+
+参考下面 for 循环的例子：
 
 ```rust
 #![allow(unused)]
@@ -3419,7 +3428,9 @@ fn main() {
 fn main() {
     let v = vec![6, 7, 8, 9];
 
-    // 显示的调用 vector 的 into_iter 方法返回一个 iterator，之后会 returns owned item
+    // 显示的调用 vector 的 into_iter 方法返回一个 iterator，
+    // 按前面说的，for 语句也可以直接接收 iterator，
+    // 之后会 returns owned item
     for num in v.into_iter() {
         println!("{}", num);
     }
@@ -3447,11 +3458,7 @@ fn main() {
 
 ---
 
-**迭代器**（iterator）：对某个序列中的项进行某些处理时，可以使用 iterator：
-
-* Rust 中，iterator 也是一个值，利用一个 iterator 能产出一个序列的值。然后再对这个序列中的的 item 进行处理（类似循环）
-
-* Rust 中，iterator 就是实现了 Iterator 这个 trait 的类型：
+再简单介绍一下 **迭代器 Trait**（iterator trait）：
 
 ```rust
 #![allow(unused)]
@@ -3471,25 +3478,18 @@ fn main() {
 ```
 
 * 注意：next 需要一个可变引用（&mut）；也就是说，每次调用 next 会消费（consume）该序列中的一项，实际上 iterator 的状态被改变（mut）了
-* Rust 中的很多集合类型（比如前面例子中的 vector），会默认实现另外一个 trait：IntoIterator，然后就可以调用这个 trait 的方法 into_iter 得到这个集合上的 iterator。不过很多集合类型默认实现的 into_iter 会转移 item 的 ownership，具体看文档
+* Rust 中的很多集合类型（比如前面例子中的 vector），会默认实现另外一个 trait：IntoIterator，然后就可以调用这个 trait 的方法 into_iter 得到这个集合上的 iterator
 
-最后再总结几个相关概念：
+### 获取 iterator
 
-* 一个 iterator 是实现了 Iterator trait 的类型
-* 某个类型实现了 IntoIterator trait，那么就可以调用 into_iter 获取到作用在这个类型上的 iterator
-  * for 语句会自动调用 into_iter 获取 iterator，然后在 iterator 上进行循环
-* iterator 能产出一个序列（然后可以处理这个序列中的各个值）
-* iterator 本身也是一个值
-* 不断调用 next() 方法，对 iterator 产出的序列中的值进行处理叫做消费（consume）
+Rust 的标准库为了方便开发者，为各个「Collect 类型」提供了多种 [Iterator](#iterator)。
 
-### 创建 iterator
+其中，为大多数 Collect 类型提供了另外 **2 个方法**来获取 iterator：
 
-按上一节说的，可以使用 into_iter() 方法 来获取到一个类型上的 iterator。但很多时候，into_iter 会转移 ownership，所以又提供了另外 2 个方法来获取 iterator：
+* **iter()** 方法：返回的 iterator 获取到序列中 item 的**不变引用**，对 item 只读不修改（不转移 item 的 ownership）
+* **iter_mut()** 方法：返回的 iterator 获取到序列中 item 的**可变引用**，可以修改 item（不转移 item 的 ownership）
 
-* iter() 方法：通过这个 iterator 获取到序列中 item 的**不变引用**，对 item 只读不修改（不转移 item 的 ownership）
-* iter_mut() 方法：通过这个 iterator 获取到序列中 item 的**可变引用**，可以修改 item（不转移 item 的 ownership）
-
-一个调用 iter() 方法的例子：
+一个在 vector 类型上使用 `iter()` 的例子：
 
 ```rust
 #![allow(unused)]
@@ -3505,6 +3505,22 @@ fn main() {
     assert_eq!(iterator.next(), Some(&6));
     assert_eq!(iterator.next(), None);
 }
+```
+
+> 总之，大多数场景下，`iter()` 方法可以遍历使用 item 的「引用」。但到具体某个「Collect 类型」是不是确实是返回 item 的「引用」可以参考文档。
+
+另外，要拿到某个类型的 [Iterator](#iterator)，也可以直接调用 `into_iter()` 方法。当如先需要查询文档确认该「类型」是否实现了 **IntoIterator Trait**）。其中大多数「Collect 类型」都实现了几种 **IntoIterator Trait**，例如：
+
+* &T：只读，不转移 ownership。**在「不变引用」上调用 into_iter()** 的场景
+* &mut T：读写，不转移 ownership。**通常在「可变引用」上调用 into_iter()** 的场景。比如常用的 `(&mut vector).into_iter()`
+* T：转移 ownership。例如：**直接通过「值」来调用 into_iter() 的场景**
+
+总之，通常在不同的场景可以使用 3 种调用 `into_iter()` 的方式（不过具体还是要查文档）：
+
+```rust
+for element in &collection { ... }
+for element in &mut collection { ... }
+for element in collection { ... }
 ```
 
 ### 使用 iterator
