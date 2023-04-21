@@ -3143,10 +3143,10 @@ fn main() {
 
 ## closure
 
-* closure 就是匿名函数，可以赋值给变量，也可以作为函数的参数来使用。例如，可以把 closure 作为函数参数的一些库方法：
+* [closure](#closure) 就是匿名函数，可以赋值给变量，也可以作为函数的参数来使用。例如，可以把 [closure](#closure) 作为函数参数的一些库方法：
   * Iterator
   * thread::spawn
-* 一般来说，Rust 会自动推断 closure 用到的类型。但也可以使用「类型标注」标明其类型
+* 一般来说，Rust 会自动推断 [closure](#closure) 用到的类型。但也可以使用「类型标注」标明其类型
 
 ```rust
 #![allow(unused)]
@@ -3164,7 +3164,8 @@ fn main() {
 }
 ```
 
-* closure 和函数的不同在于，closure 不仅仅可以使用入参，也可以捕获（capture）并使用调用者作用域中的值
+* [closure](#closure) 和函数的不同在于，[closure](#closure) 不仅仅可以使用入参，也可以捕获（**capture**）并使用调用者作用域中的值
+  * 这里可以参考一下后面提到的 `Fn`，`FnMut`，`FnOnce`
 
 ```rust
 fn main() {
@@ -3179,8 +3180,8 @@ fn main() {
 }
 ```
 
-* closure 会自动 borrow 捕获的值（默认创建一个指向值的引用，又有 2 种可能：「可变引用」和「不可变引用」）
-  * 只要 closure 自己会在该引用指向的值的之前被 dropped，那么就是符合生命周期规则，没有问题
+* [closure](#closure) 会自动 **[borrow](#borrowing)** 捕获的值（默认创建一个指向值的引用，又有 2 种可能：「可变引用」和「不可变引用」）
+  * 只要 [closure](#closure) 自己会在该引用指向的值的之前被 dropped，那么就是符合生命周期规则，没有问题
 
 一个简单的例子：
 
@@ -3198,9 +3199,9 @@ fn main() {
 }
   ```
 
-* 但如果不能保证 closure 自己会在该引用指向的值的前面被 dropped，不能通过编译
-* 此时可以考虑使用 move 关键字，使用 move 关键字后，closure 会把捕获的值 move 到 closure 内部，并拿到这个值的 ownership
-  * 然后当这个 closure 被 dropped 的时候，这个参数的值也会被 dropped
+* 但如果不能保证 [closure](#closure) 自己会在该引用指向的值的前面被 dropped，不能通过编译
+* 此时可以考虑使用 **move** 关键字，使用 move 关键字后，[closure](#closure) 会把捕获的值 [move](#move) 到 [closure](#closure) 内部，并拿到这个值的 [ownership](#ownership)
+  * 然后当这个 [closure](#closure) 被 dropped 的时候，这个参数的值也会被 dropped
 
 一个简单的例子：
 
@@ -3220,7 +3221,7 @@ fn main() {
 }
 ```
 
-一个进行 clone 之后再使用 closure 的简单例子：
+一个进行 clone 之后再使用 [closure](#closure) 的简单例子：
 
 ```rust
 fn main() {
@@ -3257,7 +3258,7 @@ fn sort_cities(cities: &mut Vec<City>) {
 
 * 按人口降序排序
 * 有点像其他语言（Java）中的匿名函数
-* 但 Rust 的 closure 和其他语言的匿名函数又有区别
+* 但 Rust 的 [closure](#closure) 和其他语言的匿名函数又有区别
 
 ---
 
@@ -3294,9 +3295,9 @@ fn start_sorting_thread(mut cities: Vec<City>, stat: Statistic)
 
 Rust 会提示这段代码编译错误。错误的根源如下：
 
-* 这个新的线程的工作完成之前，stat 和 cities 这 2 个变量都必须存活；但上面的代码按 borrow 的话，没有这个保证
+* 这个新的线程的工作完成之前，stat 和 cities 这 2 个变量都必须存活；但上面的代码按 [borrow](#borrowing) 的话，没有这个保证
 
-解决方法是利用 **move** 关键字告诉 Rust 把 stat 和 cities 这 2 个变量 move 到 closure（而不是像前个例子那样走 borrow 逻辑）。代码如下：
+解决方法是利用 **move** 关键字告诉 Rust 把 stat 和 cities 这 2 个变量 [move](#move) 到 [closure](#closure)（而不是像前个例子那样走 [borrow](#borrowing) 逻辑）。代码如下：
 
 ```rust
 fn start_sorting_thread(mut cities: Vec<City>, stat: Statistic)
@@ -3313,11 +3314,11 @@ fn start_sorting_thread(mut cities: Vec<City>, stat: Statistic)
 }
 ```
 
-* 【回顾一下】：borrow 和 move 的本质区别在于 ownership 是否改变
+* 【回顾一下】：[borrow](#borrowing) 和 [move](#move) 的本质区别在于 [ownership](#ownership) 是否改变
 
 ---
 
-再特别说明一下**把函数作为另外一个函数的入参**，和**把 closure 作为另外一个函数的入参**的区别。
+再特别说明一下**把函数作为另外一个函数的入参**，和**把 [closure](#closure) 作为另外一个函数的入参**的区别。
 
 先看一个**把函数作为另外一个函数入参**的例子：
 
@@ -3337,7 +3338,7 @@ fn count_selected_cities(cities: &Vec<City>, test_fn: fn(&City) -> bool) -> usiz
 }
 ```
 
-但是不能把一个 closure 传给这个例子函数 count_selected_cities。因为 count_selected_cities 的入参是函数而不是 closure。
+但是不能把一个 [closure](#closure) 传给这个例子函数 count_selected_cities。因为 count_selected_cities 的入参是函数而不是 closure。
 
 如果需要把 closure 作为入参，需要这样定义 count_selected_cities：
 
@@ -3358,14 +3359,14 @@ fn count_selected_cities(cities: &Vec<City>, test_fn: F) -> usize
 
 也就是说：
 
-* fn(&City) -> bool // fn (只能是把函数作为入参)
-* Fn(&City) -> bool // Fn trait (既可以是函数作为入参，也可以是 closure 作为入参)
+* `fn(&City) -> bool` // fn (只能是把函数作为入参)
+* `Fn(&City) -> bool` // Fn trait (既可以是函数作为入参，也可以是 closure 作为入参)
 
 上面的 Fn 是 Rust 语言支持的 trait。实际上，Rust 一共支持 3 种类型的 closure trait，开发者可以根据具体情况选择使用哪一种：
 
-* FnOnce：当 closure 只能被执行一次时使用
-* FnMut：当 closure 会对值（通过 borrow 或者 move 拿到的值）进行修改时使用
-* Fn：当 closure 不会对值（通过 borrow 或者 move 拿到的值）进行修改时使用
+* **FnOnce**：当 [closure](#closure) 只能被执行一次时使用
+* **FnMut**：当 [closure](#closure) 会对值（通过 borrow 或者 move 拿到的值）进行修改时使用
+* **Fn**：当 [closure](#closure) 不会对值（通过 borrow 或者 move 拿到的值）进行修改时使用
 
 一个 Fn Mut 的例子：
 
@@ -3386,11 +3387,11 @@ fn main() {
 
 总结：
 
-* Fn closure：没有限制，可以被调用多次。而且所有普通的函数类型：fn 也都是 Fn
-* FnMut closure：可以被调用多次，但使用的时候，需要用 mut 标明该 closure
-* FnOnce closure：只能被调用一次
+* **Fn closure**：没有限制，可以被调用多次。而且所有普通的函数类型：fn 也都是 Fn
+* **FnMut closure**：可以被调用多次，但使用的时候，需要用 mut 标明该 [closure](#closure)
+* **FnOnce closure**：只能被调用一次
 
-这 3 种类型的 closure 使用限制一个比一个严格，它们的从属关系是：Fn 是 FnMut 的子 trait；FnMut 是 FnOnce 的子 trait。
+> 这 3 种类型的 [closure](#closure) 使用限制一个比一个严格，它们的从属关系是：Fn 是 FnMut 的子 trait；FnMut 是 FnOnce 的子 trait。
 
 ## Iterator
 
@@ -3399,7 +3400,7 @@ fn main() {
 先明确几个概念：
 
 * 所谓 [Iterator](#iterator) 就是实现了 `Iterator` trait 的「类型」。
-* 「某个类型可迭代」（**iterable**）就是指该类型实现了 `IntoIterator`，也就是对这个「类型」可以通过 `into_iter` 方法获取到「该类型对应的 iterator」。从而可以通过  [Iterator](#iterator) 来做遍历操作
+* 「某个类型可迭代」（**iterable**）就是指该类型实现了 `IntoIterator`，也就是对这个「类型」可以通过 `into_iter()` 方法获取到「该类型对应的 iterator」。从而可以通过  [Iterator](#iterator) 来做遍历操作
   * [Iterator](#iterator) 生产（produces）「值」
   * 获取到  [Iterator](#iterator) 生产（produces）的「值」的代码就是「消费者」（consumer）
 
