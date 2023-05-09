@@ -3543,6 +3543,39 @@ for element in collection { ... }
 
 参考具体文档熟悉更多的 Iterator Adaptor。
 
+#### map
+
+[map](#map) 通过对 [iterator](#iterator) 的 items 实施一个 closure 来对 [iterator](#iterator) 进行转换。
+
+一个例子：
+
+```rust
+// str::trim 作用到 iterator 的 items 上，转换出另外一个 iterator
+// 最后再调用 collect() 把 iterator 转换为 vector
+let text = " ponies \n giraffes\niguanas \nsquid".to_string();
+let v: Vec<&str> = text.lines()
+    .map(str::trim)
+    .collect();
+
+assert_eq!(v, ["ponies", "giraffes", "iguanas", "squid"]);
+```
+
+#### flattern
+
+对 [iterator](#iterator) 使用 [flattern](#flattern) 的前提是这个 [iterator](#iterator) 中的 item 实现了 IntoIterator（也就是可以把 item 转成 [iterator](#iterator)）
+
+这样，就可以利用 [flattern](#flattern) 用来把一个 中的所有 items 「拉平」，从「二维」转换成「一维」。
+
+例如，Option 已经实现了 IntoIterator，那么我们可以这样使用 [flattern](#flattern) ：
+
+```rust
+assert_eq!(vec![None, Some("day"), None, Some("one")]
+               .into_iter()
+               .flatten()
+               .collect::<Vec<_>>(),
+               vec!["day", "one"]);
+```
+
 ## macros
 
 Rust 中的宏分以下几种：
