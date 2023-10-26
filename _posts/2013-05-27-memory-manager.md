@@ -5,8 +5,6 @@ categories: [notes]
 tags: [linux]
 ---
 
-# 内存管理
-
 本文简单介绍 Linux Kernel 怎么管理内存. 包含内核物理内存管理和用户空间内存管理两大部分.
 
 ## 1. Page Frame

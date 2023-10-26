@@ -9,9 +9,7 @@ tags: [分布式]
 
 -- James Hamilton – Windows Live Services Platform
 
-# 0. 目的
-
-本文是设计和部署易于运维的服务最佳实践的概括和总结.
+目的：本文是设计和部署易于运维的服务最佳实践的概括和总结.
 
 先提出3个原则:
 

@@ -683,7 +683,9 @@ w.push_str(" world");
 
 另外：
 
-> 将 `Rc<T>` 和 `RefCell<T>` 结合使用来实现一个拥有多重所有权的可变数据
+> 将 `Rc<T>` 和 `RefCell<T>` 结合使用来实现一个拥有多重所有权的可变数据。
+>
+> 但这种做法不是线程安全的，常用于用 Rust 刷算法题，并不会用到工程上。
 
 ## array
 
@@ -1297,10 +1299,10 @@ Patterns 内部有 identifiers 的话，这些 identifiers 会成为局部变量
 
 ```rust
 match account {
-Account {name, language, ..} => {
-ui.greet( & name, & language);
-ui.show_setting( & account); // error: borrow of moved value: `account`
-}
+    Account {name, language, ..} => {
+        ui.greet( & name, & language);
+        ui.show_setting( & account); // error: borrow of moved value: `account`
+    }
 }
 ```
 
@@ -1310,10 +1312,10 @@ ui.show_setting( & account); // error: borrow of moved value: `account`
 
 ```rust
 match account {
-Account { ref name, ref language, .. } => {
-ui.greet(name, language); // 只 borrow，不消费
-ui.show_setting( & account); // ok
-}
+    Account { ref name, ref language, .. } => {
+        ui.greet(name, language); // 只 borrow，不消费
+        ui.show_setting( & account); // ok
+    }
 }
 ```
 
