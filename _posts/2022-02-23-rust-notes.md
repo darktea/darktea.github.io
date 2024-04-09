@@ -687,12 +687,14 @@ w.push_str(" world");
 >
 > 但这种做法不是线程安全的，常用于用 Rust 刷算法题，并不会用到工程上。
 
+总之，[RefCell](#refcell) 提供了一种在编译期间绕过 Rust 不变性检查的方法；但同时也付出了复杂性的代价。
+
 ## array
 
 Rust 中表示内存中连续的值的序列的类型有 3 种：
 
 * Array：`[T; N]`
-* `Vector：`Vec<T>`
+* `Vector：Vec<T>`
 * `Slice：&[T]` 和 `&mut [T]
 
 > 这 3 种形式中 `v[i]` 都代表的是第 i 个元素。
@@ -1098,6 +1100,10 @@ fn main() {
 
 ## struct
 
+Rust 中利用 [struct](#struct) 实现了一种把不同的数据聚合在一起的方法。这种方法主要使用在需要不同数据类型需要同时存在在一起的场景。
+
+以此向对应的，如果需要把多种数据类型聚合在一起，但不需要它们同时出现，可以使用 [enum](#enum) 。
+
 定义一个 struct ，然后定义一个返回 struct 的方法
 
 ```rust
@@ -1230,6 +1236,27 @@ fn main() {
 ```
 
 > 注意：struct 的生命周期请参考：[结构体的生命周期注解](#结构体的生命周期注解)
+
+### type-associated functions
+
+impl 的实现中，有时候不是针对单个 struct 实例的，而是针对整个类型，所以参数列表中没有  self 参数。
+
+把参数中没有 self 的 methods 叫做 type-associated functions。例如：
+
+```rust
+impl Queue {
+  pub fn new() -> Queue {
+    Queue { older: Vec::new(), younger: Vec::new() }
+  }
+}
+```
+
+对应的使用方法如下：
+
+```rust
+let mut q = Queue::new();
+q.push('*');
+```
 
 ## enum
 

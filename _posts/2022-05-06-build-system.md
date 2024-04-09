@@ -503,6 +503,7 @@ double double_copy(size_t len, double target[len], double const source[len]);
 * `void *`：无类型的指针。任何对象的指针**无需强转就**可以转换为 `void*`，但也会损失掉这个对象的 type 信息
   * 尽管损失了 type 信息，但转换过程中 object 对应的 storage 实例是不会动的。在用强转回来以后，还能恢复原先的类型和数据（值能保持一致）
   * 一种常见的做法是：函数的入参是一个 `void*` 参数和一个 `size_t` 的参数，这样的话，代表该函数要对一段固定长度（`size_t` 为单位）的内存做操作，而不关心这段内存中的数据的类型（例如：memcpy 和 memset）
+  * 还有一种常见情况：创建「线程」时「程序员」需要传递数据到线程中，pthread_create 函数有一个参数的类型就是 `void*`，其含义就是「程序员」可以传入任何类型的数据到线程中。当然，「程序员」自己知道这个 `void*` 是什么类型的，「程序员」会在「线程」中做一次 recast 把数据转换回到正确的类型。当然，这种 recast 的正确性完成由「程序员」保证。
   * `void*` 还是能不用就尽量不用
   
 * `restrict` 关键字：用 restrict 修饰指针类型告诉「编译器」两个指针不指向同一数据（开发人员保证）。也就是该指针只会指向一个 object，不会 aliasing 其他对象
@@ -516,6 +517,27 @@ void* memcpy(void*restrict s1, void const*restrict s2, size_t n);
 
 // 而 memmove 不能使用 restrict（可能发生 Pointer aliasing）
 void* memmove(void* s1, const void* s2, size_t n);
+```
+
+* 一般来说，函数的参数的类型都是「指针」，而不能是「数组」。唯一的例外只是在对函数进行「声明」的时候，下面三种写法等价：
+
+```c
+int func(int *a);     /*写法1*/
+int func(int a[]);    /*写法2*/
+int func(int a[10]);  /*写法3：编译器会忽略 10 */
+```
+
+* C99 中给出了「可变结构体」的标准定义。例如：
+
+```c
+typedef struct {
+    int     length;
+    Point   point[]; // 这里不指定长度
+} Polyline;
+
+// 利用 malloc 对其进行初始化一个长度为 5 的结构体：
+Polyline* polyline = malloc(sizeof(Polyline) + sizeof(Point) * 5);
+polyline->length = 5;
 ```
 
 #### inline
@@ -576,3 +598,8 @@ toto* toto_init(toto*);
     * union 是个例外：Any member of an object that has an effective union type can be accessed at any time, provided the byte representation amounts to a valid value of the access type
   * The effective type of a variable or compound literal is the type of its declaration
 * Files that are written in binary mode (fread, fwrite) are **not portable** between platforms
+
+#### 错误码
+
+* 一般还是不要用 errno 那一套方法（多线程环境不能用）。而是利用「枚举」来定义错误码，把错误码作为函数的返回值返回给「调用方」，并采用以 API 文档的形式定义错误码的具体含义。
+  * 并且要用 API 的形式告诉「调用方」如何处理对应的错误；如果和「调用方」无关（或者说是「调用方」无法处理的错误）就不需要返回错误码给「调用方」了
